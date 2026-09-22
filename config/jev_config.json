@@ -1,0 +1,16 @@
+{
+	"provider": "TypeSafe AI Jev Commercial API",
+	"endpoint": "https://api.typesafe.ai/v1/decision",
+	"api_key_env": "JEV_API_KEY",
+	"default_api_key_stub": "jev_live_mesh_token_macpro_master",
+	"timeout_ms": 500,
+	"max_retries": 2,
+	"circuit_breaker": {
+		"enabled": true,
+		"failure_threshold": 3,
+		"recovery_timeout_seconds": 30,
+		"latency_ceiling_ms": 400,
+		"fallback_target": "laya_local_engine",
+		"deadman_switch_alert": true
+	}
+}

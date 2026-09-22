@@ -1,0 +1,25 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"name": "Tier-2 Issue Component Tagging",
+	"description": "Component labeling for bug reports and feature requests",
+	"max_choices": 20,
+	"question": {
+		"component": {
+			"type": "choice",
+			"instructions": "Which functional component is affected by this issue?",
+			"criteria": {
+				"component_ui": "React widgets, sidebar views, Tailwind styles, frontend layouts",
+				"component_api": "Express/tRPC REST endpoints, JSON validation, payload handlers",
+				"component_daemon": "Background listeners, event buses, heartbeat cron runners",
+				"component_tailnet": "Tailscale IP mesh, routing rules, node-to-node reachability",
+				"component_model_engine": "Laya/ModernBERT inference, on-chip MPS runtime, Jev API client",
+				"component_storage": "SQLite, JSON state persistence, file archiving, restic backup",
+				"component_docs": "Markdown specifications, council turn reports, architecture briefs"
+			}
+		},
+		"is_regression": {
+			"type": "noul",
+			"instructions": "Did this feature work previously and suddenly break in a recent update?"
+		}
+	}
+}

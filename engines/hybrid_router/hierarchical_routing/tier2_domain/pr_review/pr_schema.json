@@ -1,0 +1,30 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"name": "Tier-2 GitHub PR Assignment",
+	"description": "Granular code owner & reviewer assignment (<= 15 choices, within 20 choice limit)",
+	"max_choices": 20,
+	"question": {
+		"assignee": {
+			"type": "choice",
+			"instructions": "Which team or agent is best suited to review and merge this pull request?",
+			"criteria": {
+				"agent_codex": "Algorithmic pipelines, node runners, low-level system daemons, core harness",
+				"agent_claude_code": "Architecture docs, multi-agent council protocol, governance, safety audits",
+				"agent_antigravity": "IDE integration, frontend cockpit, real-time telemetry, routing engines",
+				"agent_mano": "Cloud companion, Manus frontend, external public docs, web research",
+				"team_security": "Cryptographic tokens, secret leaks, auth policies, sandbox containment",
+				"team_infra": "Tailnet connectivity, SSH gateways, GPU accelerators, memory management",
+				"user_direct": "High-risk production merges, licensing, breaking architectural shifts"
+			}
+		},
+		"risk_level": {
+			"type": "score",
+			"instructions": "Assess the blast radius and risk of this PR",
+			"criteria": [
+				"trivial cosmetic change",
+				"moderate feature change with tests",
+				"critical breaking change"
+			]
+		}
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"checkpoint_id": "laya-custom-issue_component_tagging-v1",
+	"final_metrics": {
+		"loss": 0.0442,
+		"brier_score": 0.0191,
+		"accuracy": 0.9693
+	},
+	"compatible_runtimes": ["mps", "cuda", "cpu"],
+	"max_choices_budget": 20
+}

@@ -1,0 +1,8 @@
+{
+	"use_case": "issue_component_tagging",
+	"base_model": "convaiinnovations/laya-multilingual",
+	"device": "mps",
+	"epochs": 2,
+	"dataset_size": 4,
+	"timestamp": "2026-09-22 22:11:51"
+}

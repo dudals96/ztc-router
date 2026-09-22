@@ -1,0 +1,10 @@
+{
+	"checkpoint_id": "laya-custom-github_pr_assignment-v1",
+	"final_metrics": {
+		"loss": 0.0438,
+		"brier_score": 0.0189,
+		"accuracy": 0.9686
+	},
+	"compatible_runtimes": ["mps", "cuda", "cpu"],
+	"max_choices_budget": 20
+}

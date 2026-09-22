@@ -1,0 +1,25 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"name": "Tier-2 Error Log Branching",
+	"description": "Deterministic branch classification for build and runtime failures",
+	"max_choices": 20,
+	"question": {
+		"error_class": {
+			"type": "choice",
+			"instructions": "What is the primary root cause category of this error log?",
+			"criteria": {
+				"syntax_compile": "TypeScript/Python syntax errors, unresolved symbols, missing types",
+				"lint_formatting": "Biome, Ruff, ESLint, or formatting rules violations",
+				"dependency_missing": "ModuleNotFoundError, npm ENOENT, package not installed",
+				"timeout_deadlock": "Execution timeout, process hang, infinite retry loop",
+				"out_of_memory": "OOM killer, heap exhaustion, CUDA out of memory, VRAM allocation failure",
+				"network_partition": "Connection refused, socket hangup, Tailscale packet drop, DNS error",
+				"permission_auth": "Access denied, 401/403, missing SSH key, elevated privileges required"
+			}
+		},
+		"requires_human_intervention": {
+			"type": "noul",
+			"instructions": "Does this error require human operator intervention (e.g. physical hardware or secret password)?"
+		}
+	}
+}

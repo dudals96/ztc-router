@@ -1,0 +1,89 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"version": "1.0.0",
+	"policy_name": "Hybrid Decision Engine Routing Policy",
+	"codename": "HYBRID-ROUTER (LAURA-PIPELINE)",
+	"created_at": "2026-09-22T22:15:00+09:00",
+	"nodes": {
+		"laya_inference_node": {
+			"host": "richardkim-macpro-macbookpro",
+			"tailnet_ip": "100.74.61.51",
+			"device": "mps",
+			"architecture": "Apple M5 (10-core, Metal 4 Unified Memory)"
+		},
+		"jev_gateway_node": {
+			"host": "richardkim-macpro-macbookpro",
+			"tailnet_ip": "100.74.61.51",
+			"role": "Master Gateway + Circuit Breaker"
+		}
+	},
+	"routes": {
+		"laya_route": {
+			"description": "High-speed, sub-40ms local non-autoregressive decision engine",
+			"engine": "laya-multilingual",
+			"conditions": {
+				"max_tokens": 192,
+				"max_latency_ms": 40,
+				"max_choices_budget": 20,
+				"supported_decision_types": ["choice", "score", "noul"],
+				"target_task_classes": [
+					"build_error_branching",
+					"spam_filtering",
+					"github_pr_assignment",
+					"issue_component_tagging",
+					"binary_triage"
+				]
+			},
+			"hierarchical_strategy": {
+				"tier1": "core_domain_filter",
+				"tier2": "domain_specific_resolver"
+			}
+		},
+		"jev_route": {
+			"description": "Commercial API router for complex contextual analysis and high-dimensional spaces",
+			"engine": "jev-commercial-api",
+			"conditions": {
+				"min_categories": 21,
+				"task_types": [
+					"high_dimension_categorization",
+					"zero_shot_unclassified_issues",
+					"complex_context_arbitration",
+					"dynamic_ontology_mapping"
+				]
+			},
+			"circuit_breaker": {
+				"enabled": true,
+				"failure_threshold": 3,
+				"latency_ceiling_ms": 400,
+				"recovery_timeout_sec": 30,
+				"fallback_target": "laya_hierarchical_engine"
+			}
+		}
+	},
+	"rule_evaluation_order": [
+		{
+			"priority": 1,
+			"condition": "categories_count > 20",
+			"destination": "jev_route",
+			"reason": "Exceeds Laya single-question choice budget (max 20)"
+		},
+		{
+			"priority": 2,
+			"condition": "latency_strict <= 40ms or tokens_count <= 192",
+			"destination": "laya_route",
+			"reason": "Requires sub-40ms on-chip local execution"
+		},
+		{
+			"priority": 3,
+			"condition": "task_type in ['build_error_branching', 'github_pr_assignment', 'issue_component_tagging']",
+			"destination": "laya_route",
+			"reason": "Covered by fine-tuned 2-tier local decision schemas"
+		},
+		{
+			"priority": 4,
+			"condition": "default",
+			"destination": "laya_route",
+			"reason": "Local-first privacy and latency preference"
+		}
+	]
+}

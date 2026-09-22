@@ -1,0 +1,10 @@
+{
+	"checkpoint_id": "laya-custom-error_log_branching-v1",
+	"final_metrics": {
+		"loss": 0.0445,
+		"brier_score": 0.0193,
+		"accuracy": 0.97
+	},
+	"compatible_runtimes": ["mps", "cuda", "cpu"],
+	"max_choices_budget": 20
+}
