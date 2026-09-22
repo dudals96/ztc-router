@@ -17,7 +17,10 @@ import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-sys.path.insert(0, "/Users/richardkim-macpro/Pi/engines/hybrid_router")
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "engines" / "hybrid_router"))
 from router_core import HybridDecisionRouter
 
 TAILNET_NODES = {
@@ -362,8 +365,8 @@ def start_daemon():
     print(f"[*] Mode: AUTOMODE=TRUE | Topology: 4-Node Tailnet Mesh")
     print("======================================================================\n")
 
-    # 4. Start HTTP Server
-    server = HTTPServer(("127.0.0.1", ROUTER_PORT), RouterHTTPHandler)
+    # 4. Start HTTP Server (bind 0.0.0.0 to allow Tailnet peers access)
+    server = HTTPServer(("0.0.0.0", ROUTER_PORT), RouterHTTPHandler)
     server.serve_forever()
 
 

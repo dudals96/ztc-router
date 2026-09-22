@@ -12,10 +12,11 @@ import json
 import time
 import argparse
 from urllib.request import Request, urlopen
+from pathlib import Path
 from urllib.error import URLError
 
-ROUTER_URL = "http://127.0.0.1:9876"
-REPO_ROOT = "/Users/richardkim-macpro/Pi"
+REPO_ROOT = os.environ.get("PI_REPO_ROOT", str(Path(__file__).resolve().parent.parent))
+ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
 LOG_PATH = os.path.join(REPO_ROOT, "learning", "interventions.jsonl")
 
 

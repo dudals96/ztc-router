@@ -17,12 +17,13 @@ import time
 import argparse
 from typing import Dict, Any, Optional
 from urllib.request import Request, urlopen
+from pathlib import Path
 from urllib.error import URLError
 
-REPO_ROOT = "/Users/richardkim-macpro/Pi"
+REPO_ROOT = os.environ.get("PI_REPO_ROOT", str(Path(__file__).resolve().parent.parent))
 RULES_CONFIG_PATH = os.path.join(REPO_ROOT, "config", "anti_pattern_rules.json")
 LOG_PATH = os.path.join(REPO_ROOT, "learning", "interventions.jsonl")
-ROUTER_URL = "http://127.0.0.1:9876"
+ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
 
 # Fallback local import if daemon is unreachable
 sys.path.insert(0, os.path.join(REPO_ROOT, "engines", "hybrid_router"))
