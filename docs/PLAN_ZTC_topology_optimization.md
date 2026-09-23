@@ -2,7 +2,7 @@
 
 - Status: **DRAFT v0.1 — 유저 승인 대기** (§9 의 결정 항목이 확정되기 전에는 Phase 1 착수만 가능)
 - 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro, 2026-09-23
-- 발주: 유저 지시문 "Pi 토폴로지 생산성 극대화 및 ZTC 기반 분산 라우터 고도화 프로젝트 실행 계획 수립 요청" (원문: `learning/user-prompts/2026-09-23_Wed/03_ztc-topology-plan-request.md`)
+- 발주: 유저 지시문 "Pi 토폴로지 생산성 극대화 및 ZTC 기반 분산 라우터 고도화 프로젝트 실행 계획 수립 요청" (원문: `learning/user-prompts/2026-09-23_Wed/04_ztc-topology-plan-request.md`)
 - 참조: `docs/PROJECT_BRIEF.md`, `ai_guidelines.md`, `docs/AGENT_COUNCIL_PROTOCOL.md`, `engines/hybrid_router/`, `scripts/decision-gate-interceptor.py`, NV `docs/harness/PLAN_C2_worker_loop_20260922.md`, NV `docs/harness/NORTH_STAR.md`
 
 ---
