@@ -1,374 +1,252 @@
 #!/usr/bin/env python3
 """
 hybrid-router-daemon.py
-Background Daemon for Laya/Jev Hybrid Decision Engine (Codename: HYBRID-ROUTER).
-Features:
-  1. Multi-node Tailnet Echo Ping pre-flight verification.
-  2. Local-first Laya sub-40ms execution + Jev Commercial API Gateway.
-  3. HTTP REST & JSON-RPC listener for IDE sidebar extensions & CLI tools.
-  4. Broadcasts 'Laya/Jev Hybrid Daemon Ready' signal upon entering listener state.
+Local ZTC router daemon (Phase 1, shadow).
+
+- Binds 127.0.0.1 only (not configurable). Port: PI_ROUTER_PORT (default 9876).
+- ThreadingHTTPServer, request body limit 64 KB (413), per-request id (X-Request-Id).
+- POST /v1/observe  : shadow hook observations. Synchronous answer is L0 only
+                      (regex, then signature ledger). Misses go to the bounded judge queue,
+                      whose Phase 1 judge is the local keyword heuristic (candidate rows only).
+- POST /dispatch    : router_core dispatch (policy-driven), kept for the CLI.
+- GET  /health      : 200 only if the ledger answers and the judge worker is alive, else 503.
+- GET  /telemetry   : counters and measured latency percentiles. No commands, cwd or paths.
+- GET  /dashboard   : the same numbers as HTML.
+Raw data lives under PI_ROUTER_HOME. Nothing here is returned to an agent.
 """
 
-import os
-import sys
 import json
+import re
+import signal
+import sys
+import threading
 import time
-import subprocess
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from threading import Thread
-
+import uuid
+from collections import deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "engines" / "hybrid_router"))
 from router_core import HybridDecisionRouter
+from ztc import l0, telemetry
+from ztc.judge_queue import JudgeQueue
+from ztc.masking import mask_text
+from ztc.paths import BIND_HOST, ledger_path, router_home, router_port
 
-TAILNET_NODES = {
-    "SYSTEM-1 (MacBook Pro)": "100.74.61.51",
-    "SYSTEM-2 (desktop-1q6j3e6)": "100.101.16.70",
-    "SYSTEM-3 (nv-gigabyte)": "100.75.98.124",
-    "SYSTEM-4 (richardkim-i7)": "100.90.58.94"
-}
-
-ROUTER_PORT = 9876
-router_instance = None
+MAX_BODY_BYTES = 64 * 1024
+HANDLER_SOCKET_TIMEOUT_SEC = 2.0
+LATENCY_WINDOW = 2000
+REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+KNOWN_ERROR_CLASSES = {"syntax_compile", "dependency_missing", "lint_formatting", "permission_auth",
+                       "timeout_deadlock", "out_of_memory", "network_partition"}
 
 
-def run_echo_ping_verification():
-    print("\n========================================================")
-    print("  TAILNET DISTRIBUTED ECHO PING VERIFICATION (4 NODES)")
-    print("========================================================")
-    all_ok = True
-    for node_name, ip in TAILNET_NODES.items():
+class RouterState:
+    def __init__(self):
+        self.started_at = time.time()
+        self.rules = l0.load_rules()
+        self.policy = l0.policy_version()
+        self.signatures = l0.compile_signatures(self.rules)
+        self.attr = l0.attribution()
+        self.ledger = l0.Ledger(ledger_path(), self.policy)
+        self.router = HybridDecisionRouter()
+        self.queue = JudgeQueue(self._judge)
+        self._lock = threading.Lock()
+        self.counters = {"observe": 0, "l0_regex": 0, "l0_ledger": 0, "miss": 0, "pre": 0,
+                         "rejected_413": 0, "rejected_400": 0, "errors": 0}
+        self.handle_ms = deque(maxlen=LATENCY_WINDOW)
+
+    def _judge(self, sig: str, payload: dict) -> None:
+        """Async judge (Phase 1): local heuristic -> candidate row. No promotion."""
+        res = self.router.local.predict({"log": payload["text"]})
+        decision = res.get("decision", "")
+        error_class = decision if decision in KNOWN_ERROR_CLASSES else "unclassified"
+        self.ledger.put_candidate(sig, error_class, "heuristic", res.get("engine", "keyword-heuristic"),
+                                  str(payload.get("client_version") or "unknown")[:32], self.attr)
+
+    def bump(self, key: str, ms: float | None = None) -> None:
+        with self._lock:
+            self.counters[key] = self.counters.get(key, 0) + 1
+            if ms is not None:
+                self.handle_ms.append(ms)
+
+    def observe(self, body: dict, request_id: str) -> dict:
         t0 = time.perf_counter()
-        if ip == "100.74.61.51":
-            # Local loopback on System 1
-            print(f"[*] {node_name} [{ip}]: REACHABLE (Local Loopback, < 0.1ms)")
-            continue
-            
-        try:
-            res = subprocess.run(
-                ["ping", "-c", "1", "-W", "1500", ip],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=3
-            )
-            rtt = round((time.perf_counter() - t0) * 1000, 2)
-            if res.returncode == 0:
-                print(f"[✓] {node_name} [{ip}]: ECHO PING SUCCESS (RTT: {rtt}ms)")
+        event = str(body.get("event", ""))[:32]
+        program = mask_text(body.get("program", ""), limit=60)
+        text = mask_text(body.get("text", ""))  # re-mask: the daemon does not trust the client
+        verdict, queued = None, None
+        post = event in ("PostToolUse", "PostToolUseFailure")
+        if post and text:
+            sig = l0.signature(program, text, self.signatures)
+            cls = l0.classify_regex(text, self.signatures)
+            if cls:
+                verdict = {"error_class": cls, "source": "l0_regex", "signature": sig, "state": None}
             else:
-                print(f"[!] {node_name} [{ip}]: PING TIMEOUT / UNREACHABLE")
-                all_ok = False
-        except Exception as e:
-            print(f"[!] {node_name} [{ip}]: PING FAILED ({e})")
-            all_ok = False
-            
-    print("========================================================\n")
-    return all_ok
+                row = self.ledger.lookup(sig)
+                if row:
+                    verdict = {"error_class": row["error_class"], "source": "l0_ledger", "signature": sig, "state": row["state"]}
+                else:
+                    queued = self.queue.submit(sig, {"text": text, "client_version": body.get("client_version")})
+        source = verdict["source"] if verdict else ("miss" if post and text else ("no_text" if post else "pre"))
+        ms = (time.perf_counter() - t0) * 1000
+        self.bump("observe")
+        self.bump(source, ms)
+        try:
+            telemetry.append("router_events", {
+                "kind": "observe", "request_id": request_id, "event": event, "program": program,
+                "exit_code": body.get("exit_code"), "source": source,
+                "error_class": verdict["error_class"] if verdict else None,
+                "signature": verdict["signature"] if verdict else None, "queued": queued,
+                "handle_ms": round(ms, 4),
+            })
+        except OSError:
+            self.bump("errors")
+        return {"request_id": request_id, "verdict": verdict, "queued": queued}
 
+    def healthy(self) -> tuple[bool, dict]:
+        try:
+            ledger_ok = self.ledger.ping()
+        except Exception:
+            ledger_ok = False
+        worker_ok = self.queue.alive()
+        return ledger_ok and worker_ok, {"ledger": ledger_ok, "judge_worker": worker_ok, "queue_depth": self.queue.depth()}
 
-class RouterHTTPHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/health" or self.path == "/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            status_payload = {
-                "status": "ready",
-                "signal": "Laya/Jev Hybrid Daemon Ready",
-                "daemon": "HYBRID-ROUTER",
-                "port": ROUTER_PORT,
-                "timestamp": time.time()
-            }
-            self.wfile.write(json.dumps(status_payload).encode("utf-8"))
-
-        elif self.path == "/telemetry":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            
-            # Aggregate stats from interventions.jsonl
-            log_path = "/Users/richardkim-macpro/Pi/learning/interventions.jsonl"
-            total_tokens = 0
-            total_latency = 0.0
-            events = []
-            if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line: continue
-                        try:
-                            d = json.loads(line)
-                            if "tokens_saved" in d:
-                                total_tokens += d.get("tokens_saved", 0)
-                                total_latency += d.get("latency_ms", 0.0)
-                                events.append(d)
-                        except Exception:
-                            pass
-            
-            count = len(events)
-            avg_lat = round(total_latency / max(count, 1), 2)
-            telemetry_data = {
-                "interventions_count": count,
-                "total_tokens_saved": total_tokens,
-                "est_cost_saved_usd": round(total_tokens * 0.000015, 2),
-                "avg_latency_ms": avg_lat,
-                "est_time_saved_sec": round(total_tokens / 500, 1),
-                "recent_events": events[-10:]
-            }
-            self.wfile.write(json.dumps(telemetry_data).encode("utf-8"))
-
-        elif self.path == "/dashboard" or self.path == "/":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            
-            html_content = """<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>HYBRID-ROUTER 의사결정엔진 토큰 가시화 대시보드</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    :root {
-      --bg: #090d16;
-      --card-bg: rgba(22, 30, 49, 0.7);
-      --card-border: rgba(59, 130, 246, 0.2);
-      --accent: #3b82f6;
-      --accent-glow: rgba(59, 130, 246, 0.35);
-      --green: #10b981;
-      --green-glow: rgba(16, 185, 129, 0.3);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-      background: radial-gradient(circle at 50% 0%, #172554 0%, var(--bg) 60%);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 30px 20px;
-    }
-    .container { max-width: 1100px; margin: 0 auto; }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 28px; padding-bottom: 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    .badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(16, 185, 129, 0.15); color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 6px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600;
-    }
-    .badge .dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; box-shadow: 0 0 8px #34d399; }
-    h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
-    .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(12px);
-      border-radius: 16px;
-      padding: 22px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .card:hover { transform: translateY(-2px); border-color: rgba(59, 130, 246, 0.5); }
-    .card-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; }
-    .card-val { font-size: 2rem; font-weight: 800; color: #fff; }
-    .card-val.green { color: #34d399; text-shadow: 0 0 16px var(--green-glow); }
-    .card-val.blue { color: #60a5fa; text-shadow: 0 0 16px var(--accent-glow); }
-    .card-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
-    .comparison-section {
-      background: var(--card-bg); border: 1px solid var(--card-border);
-      border-radius: 16px; padding: 24px; margin-bottom: 28px;
-    }
-    .comp-bar { margin: 16px 0 10px; }
-    .bar-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .bar-label { font-size: 0.9rem; font-weight: 600; width: 180px; }
-    .bar-track { flex: 1; height: 12px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; margin: 0 16px; }
-    .bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s; }
-    .fill-red { background: linear-gradient(90deg, #f87171, #ef4444); }
-    .fill-green { background: linear-gradient(90deg, #34d399, #10b981); }
-    .bar-time { font-size: 0.9rem; font-weight: 700; width: 80px; text-align: right; }
-    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.85rem; }
-    th { text-align: left; padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-weight: 600; }
-    td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
-    .pill-green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .pill-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>⚡ HYBRID-ROUTER 가시화 대시보드</h1>
-        <div class="subtitle">플래그쉽 에이전트 과도 추론 방지 및 실시간 토큰 가성비 모니터링</div>
-      </div>
-      <div class="badge">
-        <span class="dot"></span>
-        <span>DAEMON READY : PORT 9876</span>
-      </div>
-    </header>
-
-    <div class="grid">
-      <div class="card">
-        <div class="card-title">방지된 낭비 토큰 (Tokens Saved)</div>
-        <div class="card-val green" id="stat-tokens">-</div>
-        <div class="card-desc" id="stat-cost">약 $0.00 상당 LLM 비용 절감</div>
-      </div>
-      <div class="card">
-        <div class="card-title">실제 해결 소요시간 (Avg Latency)</div>
-        <div class="card-val blue" id="stat-lat">-</div>
-        <div class="card-desc">Laya Apple M5 온칩 18ms 추론</div>
-      </div>
-      <div class="card">
-        <div class="card-title">절약된 대기시간 (Time Saved)</div>
-        <div class="card-val green" id="stat-time">-</div>
-        <div class="card-desc" id="stat-speedup">기존 CoT 생성 대비 800배+ 고속화</div>
-      </div>
-      <div class="card">
-        <div class="card-title">강제 개입 횟수 (Interventions)</div>
-        <div class="card-val" id="stat-count">-</div>
-        <div class="card-desc">스킬 생성 차단 & 에러 루프 단절</div>
-      </div>
-    </div>
-
-    <div class="comparison-section">
-      <h3>⏱️ 반응 속도 및 토큰 소모 직관적 비교</h3>
-      <div class="comp-bar">
-        <div class="bar-row">
-          <div class="bar-label">🔴 플래그쉽 LLM (CoT 추론)</div>
-          <div class="bar-track"><div class="bar-fill fill-red" style="width: 100%;"></div></div>
-          <div class="bar-time" style="color: #f87171;">~15.0 초</div>
-        </div>
-        <div class="bar-row">
-          <div class="bar-label">🟢 Laya 엔진 강제 개입</div>
-          <div class="bar-track"><div class="bar-fill fill-green" style="width: 2%;"></div></div>
-          <div class="bar-time" style="color: #34d399;">0.02 초</div>
-        </div>
-      </div>
-      <div style="font-size: 0.8rem; color: var(--text-muted); text-align: right;">
-        * 불필요한 생각(CoT)을 물리적으로 생략하여 99.8% 시간 및 100% 토큰 절감
-      </div>
-    </div>
-
-    <div class="comparison-section">
-      <h3>🛡️ 실시간 강제 개입 및 차단 내역 (Live Feed)</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>시각</th>
-            <th>구분</th>
-            <th>방지 토큰</th>
-            <th>해결 속도</th>
-            <th>차단된 안티패턴 및 처방 내용</th>
-          </tr>
-        </thead>
-        <tbody id="events-table">
-          <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">데이터를 불러오는 중...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <script>
-    async function refreshData() {
-      try {
-        const res = await fetch('/telemetry');
-        const data = await res.json();
-        document.getElementById('stat-tokens').innerText = Number(data.total_tokens_saved).toLocaleString() + ' tok';
-        document.getElementById('stat-cost').innerText = '약 $' + data.est_cost_saved_usd.toFixed(2) + ' 상당 LLM 비용 절약';
-        document.getElementById('stat-lat').innerText = data.avg_latency_ms.toFixed(1) + ' ms';
-        document.getElementById('stat-time').innerText = data.est_time_saved_sec.toFixed(1) + ' 초';
-        document.getElementById('stat-count').innerText = data.interventions_count + ' 회';
-
-        const tbody = document.getElementById('events-table');
-        if (data.recent_events && data.recent_events.length > 0) {
-          tbody.innerHTML = data.recent_events.reverse().map(ev => {
-            const time = (ev.timestamp || '').split('T')[1]?.substring(0, 8) || '-';
-            const isSkill = (ev.description || '').includes('skill');
-            const pillClass = isSkill ? 'pill-blue' : 'pill-green';
-            const typeLabel = isSkill ? '스킬생성차단' : '에러루프단절';
-            return `<tr>
-              <td>${time}</td>
-              <td><span class="pill ${pillClass}">${typeLabel}</span></td>
-              <td style="font-weight:700; color:#34d399;">+${Number(ev.tokens_saved || 0).toLocaleString()} tok</td>
-              <td>${Number(ev.latency_ms || 0).toFixed(1)} ms</td>
-              <td>${ev.description || '-'}</td>
-            </tr>`;
-          }).join('');
+    def snapshot(self) -> dict:
+        with self._lock:
+            lat = list(self.handle_ms)
+            counters = dict(self.counters)
+        return {
+            "uptime_sec": round(time.time() - self.started_at, 1),
+            "policy_version": self.policy,
+            "counters": counters,
+            "handle_ms": {f"p{q}": telemetry.percentile(lat, q) for q in (50, 95, 99)},
+            "handle_ms_window": len(lat),
+            "queue": {**self.queue.stats, "depth": self.queue.depth(), "capacity": self.queue.capacity},
+            "ledger": self.ledger.counts(),
+            "note": "measured values only; earlier dashboard figures (18 ms, 800x, 99.8%) were constants, not measurements",
         }
-      } catch (e) {
-        console.error("Telemetry fetch failed:", e);
-      }
-    }
-    refreshData();
-    setInterval(refreshData, 3000);
-  </script>
-</body>
-</html>"""
-            self.wfile.write(html_content.encode("utf-8"))
 
-        else:
-            self.send_response(404)
+    def close(self) -> None:
+        self.queue.shutdown()
+        self.ledger.close()
+
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>ZTC Router (shadow)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>body{font-family:-apple-system,sans-serif;margin:24px;background:#fff;color:#111}
+@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}
+pre{white-space:pre-wrap;font-size:13px}</style></head>
+<body><h1>ZTC Router — shadow mode</h1>
+<p>실측값만 표시한다. 에이전트에 주입되는 것은 없다. 이전 대시보드의 18 ms·800배·99.8% 는 코드 상수였다.</p>
+<pre id="t">loading…</pre>
+<script>async function r(){try{const x=await fetch('/telemetry');document.getElementById('t').textContent=
+JSON.stringify(await x.json(),null,2)}catch(e){document.getElementById('t').textContent='unreachable'}}
+r();setInterval(r,3000);</script></body></html>"""
+
+
+def make_handler(state: RouterState):
+    class RouterHTTPHandler(BaseHTTPRequestHandler):
+        timeout = HANDLER_SOCKET_TIMEOUT_SEC
+        server_version = "ztc-router/1"
+        sys_version = ""
+
+        def _request_id(self) -> str:
+            rid = self.headers.get("X-Request-Id", "")
+            return rid if REQUEST_ID_RE.match(rid) else uuid.uuid4().hex[:16]
+
+        def _send(self, code: int, payload, request_id: str, content_type: str = "application/json") -> None:
+            data = payload if isinstance(payload, bytes) else json.dumps(payload).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("X-Request-Id", request_id)
+            self.send_header("Connection", "close")
             self.end_headers()
+            self.wfile.write(data)
+            self.close_connection = True
 
-    def do_POST(self):
-        if self.path == "/route" or self.path == "/dispatch":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+        def _read_json(self, rid: str):
             try:
-                task = json.loads(body.decode("utf-8"))
-                result = router_instance.dispatch(task)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(result).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
+                length = int(self.headers.get("Content-Length", ""))
+            except ValueError:
+                self._send(411, {"error": "length_required"}, rid)
+                return None
+            if length > MAX_BODY_BYTES:
+                state.bump("rejected_413")
+                self._send(413, {"error": "payload_too_large", "limit": MAX_BODY_BYTES}, rid)
+                return None
+            try:
+                return json.loads(self.rfile.read(length).decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                state.bump("rejected_400")
+                self._send(400, {"error": "invalid_json"}, rid)
+                return None
 
-    def log_message(self, format, *args):
-        # Quiet standard HTTP logs
-        return
+        def do_GET(self):
+            rid = self._request_id()
+            if self.path in ("/health", "/status"):
+                ok, detail = state.healthy()
+                self._send(200 if ok else 503, {"status": "ready" if ok else "degraded", **detail}, rid)
+            elif self.path == "/telemetry":
+                self._send(200, state.snapshot(), rid)
+            elif self.path in ("/dashboard", "/"):
+                self._send(200, DASHBOARD_HTML.encode("utf-8"), rid, "text/html; charset=utf-8")
+            else:
+                self._send(404, {"error": "not_found"}, rid)
+
+        def do_POST(self):
+            rid = self._request_id()
+            if self.path not in ("/v1/observe", "/dispatch", "/route"):
+                self._send(404, {"error": "not_found"}, rid)
+                return
+            body = self._read_json(rid)
+            if body is None:
+                return
+            if not isinstance(body, dict):
+                state.bump("rejected_400")
+                self._send(400, {"error": "invalid_json"}, rid)
+                return
+            try:
+                result = state.observe(body, rid) if self.path == "/v1/observe" else state.router.dispatch(body)
+            except Exception as exc:
+                state.bump("errors")
+                self._send(500, {"error": type(exc).__name__}, rid)
+                return
+            self._send(200, result, rid)
+
+        def log_message(self, format, *args):
+            return
+
+    return RouterHTTPHandler
 
 
-def start_daemon():
-    global router_instance
-    print("[INIT] Initializing Hybrid Decision Router Core...")
-    router_instance = HybridDecisionRouter()
-    
-    # 1. Run Pre-Flight Echo Ping
-    run_echo_ping_verification()
-    
-    # 2. Warm up Laya & Jev pipelines
-    warmup_task = {"task_type": "build_error_branching", "content": {"log": "init warmup"}}
-    warmup_res = router_instance.dispatch(warmup_task)
-    print(f"[WARMUP] Local Engine Warmup Completed. Latency: {warmup_res['total_pipeline_latency_ms']}ms")
+def make_server(port: int | None = None) -> tuple[ThreadingHTTPServer, RouterState]:
+    state = RouterState()
+    server = ThreadingHTTPServer((BIND_HOST, router_port() if port is None else port), make_handler(state))
+    server.daemon_threads = True
+    return server, state
 
-    # 3. Emit the required readiness signal
-    print("\n" + "="*70)
-    print(">>> [SIGNAL] Laya/Jev Hybrid Daemon Ready <<<")
-    print("======================================================================")
-    print(f"[*] Background Listener active on http://127.0.0.1:{ROUTER_PORT}")
-    print(f"[*] Serving Anti-Gravity Sidebar Extension & CLI Clients")
-    print(f"[*] Mode: AUTOMODE=TRUE | Topology: 4-Node Tailnet Mesh")
-    print("======================================================================\n")
 
-    # 4. Start HTTP Server (bind 0.0.0.0 to allow Tailnet peers access)
-    server = HTTPServer(("0.0.0.0", ROUTER_PORT), RouterHTTPHandler)
-    server.serve_forever()
+def main() -> None:
+    server, state = make_server()
+    host, port = server.server_address[:2]
+
+    def stop(signum, frame):
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    print(f"[ztc-router] listening on http://{host}:{port} (home {router_home()}, policy {state.policy})", flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        state.close()
+        print("[ztc-router] stopped", flush=True)
 
 
 if __name__ == "__main__":
-    start_daemon()
+    main()

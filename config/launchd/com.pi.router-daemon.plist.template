@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TEMPLATE ONLY. Not registered. Registration (launchctl bootstrap) is a separate user
+  approval (plan v0.3 §10-2, G4) and is outside ZTC Phase 1.
+  Placeholders: __PYTHON3__ (absolute python3), __REPO__ (absolute checkout path),
+  __HOME__ (user home), __PORT__ (9876 for the merged build; track drafts use 9877/9878),
+  __ROUTER_HOME__ (default __HOME__/.pi-router).
+  The daemon binds 127.0.0.1 only; there is no setting to change that.
+  Logs go under the router home, not the repository.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.pi.router-daemon</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__PYTHON3__</string>
+		<string>__REPO__/scripts/hybrid-router-daemon.py</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PI_ROUTER_PORT</key>
+		<string>__PORT__</string>
+		<key>PI_ROUTER_HOME</key>
+		<string>__ROUTER_HOME__</string>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>30</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>Umask</key>
+	<integer>63</integer>
+	<key>StandardOutPath</key>
+	<string>__ROUTER_HOME__/daemon.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>__ROUTER_HOME__/daemon.err.log</string>
+</dict>
+</plist>

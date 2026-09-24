@@ -1,0 +1,16 @@
+# W2 baseline (수정 전) — 2026-09-24 18:57:33 KST, HEAD fc79718, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+# PI_REPO_ROOT=/private/tmp/claude-501/-Users-richardkim-macpro-Pi-wt-ztc-opus55/6a085102-216b-4e42-8bd3-1ae090674756/scratchpad/baseline (main 체크아웃 개입 로그 오염 방지). 주의: test_interceptor.py:16 은 /Users/richardkim-macpro/Pi/scripts 를 import — 즉 이 기준선의 인터셉터 3건은 main 체크아웃 코드를 시험한다
+test_circuit_breaker_deadman_switch (test_hybrid_router.TestHybridRouter.test_circuit_breaker_deadman_switch) ... ok
+test_high_dimension_jev_routing (test_hybrid_router.TestHybridRouter.test_high_dimension_jev_routing) ... ok
+test_use_case_1_pr_assignment (test_hybrid_router.TestHybridRouter.test_use_case_1_pr_assignment) ... ok
+test_use_case_2_issue_component_tagging (test_hybrid_router.TestHybridRouter.test_use_case_2_issue_component_tagging) ... ok
+test_use_case_3_error_log_branching (test_hybrid_router.TestHybridRouter.test_use_case_3_error_log_branching) ... ok
+test_allow_legitimate_source_file (test_interceptor.TestDecisionGateInterceptor.test_allow_legitimate_source_file) ... ok
+test_block_redundant_skill_creation (test_interceptor.TestDecisionGateInterceptor.test_block_redundant_skill_creation) ... ok
+test_short_circuit_error_loop (test_interceptor.TestDecisionGateInterceptor.test_short_circuit_error_loop) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.066s
+
+OK
+sandbox learning rows written:        2

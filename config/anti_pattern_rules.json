@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"policy_name": "Coding Agent Anti-Pattern Interception Rules",
 	"codename": "DECISION-GATE-INTERCEPTOR",
 	"created_at": "2026-09-22T23:15:00+09:00",
@@ -9,23 +9,20 @@
 	"rules": {
 		"skill_generation_interception": {
 			"enabled": true,
-			"description": "Block agents from generating ad-hoc skill files or one-off classifiers when Laya engine is already available",
+			"description": "Flag one-off classifier/parser scripts (skills/** is not blocked: ai_guidelines §2 encourages skills)",
 			"target_tools": ["write_to_file", "replace_file_content"],
 			"file_path_patterns": [
-				"(?:^|/)skills/.*\\.skill\\.md$",
-				"(?:^|/)skills/.*/SKILL\\.md$",
 				".*_classifier\\.py$",
 				".*_parser\\.py$",
 				"(?:^|/)temp_.*\\.py$",
 				".*_triage\\.py$",
 				".*classify.*\\.sh$"
 			],
-			"action": "INTERCEPT_AND_OVERRIDE",
-			"tokens_saved_estimate": 8500
+			"action": "INTERCEPT_AND_OVERRIDE"
 		},
 		"error_loop_short_circuit": {
 			"enabled": true,
-			"description": "Intercept command execution failures, evaluate root cause via Laya within 18ms, and inject deterministic fix prescription",
+			"description": "Classify command failures with the error_signatures regexes (L0); shadow mode records only",
 			"target_tools": ["run_command"],
 			"consecutive_failure_threshold": 1,
 			"error_signatures": {
@@ -65,8 +62,7 @@
 					"prescribed_action": "Requires human operator privilege or secret credential. Halt autonomous retry loop immediately."
 				}
 			},
-			"action": "INJECT_PRESCRIPTION",
-			"tokens_saved_estimate": 12000
+			"action": "INJECT_PRESCRIPTION"
 		},
 		"telemetry_progress_trigger": {
 			"enabled": true,

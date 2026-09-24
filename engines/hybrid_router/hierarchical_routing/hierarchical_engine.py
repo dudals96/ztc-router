@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 hierarchical_engine.py
-2-Tier Hierarchical Routing Engine powered by Laya (ModernBERT/mmBERT).
-Guarantees sub-40ms execution and overcomes Laya's max 20 choice budget:
-  - Tier-1 Core: Routes input to coarse domains (PR, Issue, Build, Security, Infra) [<= 6 choices]
-  - Tier-2 Domain: Routes within the selected domain to exact action/assignee/component [<= 15 choices]
+Two-level keyword heuristic (no model is loaded; no logits, no forward pass).
+  - Level 1: keyword lists pick a coarse domain (PR, Issue, Build, Security, Infra, General)
+  - Level 2: keyword lists pick a target within that domain
+latency_ms is the measured wall time of the call. Nothing is added or capped.
 """
 
 import os
@@ -12,8 +12,10 @@ import json
 import time
 from typing import Dict, Any, List, Optional
 
+ENGINE_NAME = "keyword-heuristic"
 
-class LayaHierarchicalEngine:
+
+class HeuristicFallbackEngine:
     def __init__(self, schemas_dir: Optional[str] = None):
         base_dir = schemas_dir or os.path.dirname(os.path.abspath(__file__))
         self.tier1_path = os.path.join(base_dir, "tier1_core", "core_schema.json")
@@ -33,7 +35,7 @@ class LayaHierarchicalEngine:
         return {}
 
     def _infer_tier1(self, text_content: str) -> Dict[str, Any]:
-        """Classify input text into Tier-1 core domains (Laya single forward pass simulation)."""
+        """Pick a coarse domain by keyword match. Scores are fixed weights, not probabilities."""
         content_lower = text_content.lower()
         scores = {
             "pr_review": 0.05,
@@ -57,14 +59,14 @@ class LayaHierarchicalEngine:
         else:
             scores["general_triage"] += 0.70
 
-        # Softmax normalization
+        # Share of the fixed keyword weights (sum-normalised). Not a calibrated probability.
         total = sum(scores.values())
-        norm_scores = {k: round(v / total, 4) for k, v in scores.items()}
-        winner = max(norm_scores, key=norm_scores.get)
-        return {"domain": winner, "confidence": norm_scores[winner], "distribution": norm_scores}
+        shares = {k: round(v / total, 4) for k, v in scores.items()}
+        winner = max(shares, key=shares.get)
+        return {"domain": winner, "keyword_share": shares[winner], "distribution": shares}
 
     def _infer_tier2(self, domain: str, text_content: str) -> Dict[str, Any]:
-        """Classify domain-specific target within the selected Tier-1 domain."""
+        """Pick a target inside the domain by keyword match."""
         content_lower = text_content.lower()
         
         if domain == "pr_review":
@@ -90,7 +92,7 @@ class LayaHierarchicalEngine:
                 
             winner = max(assignee_scores, key=assignee_scores.get)
             risk = 2 if "breaking" in content_lower else (1 if "refactor" in content_lower else 0)
-            return {"assignee": winner, "risk_level": risk, "confidence": 0.94}
+            return {"assignee": winner, "risk_level": risk}
 
         elif domain == "issue_triage":
             comp_scores = {
@@ -113,7 +115,7 @@ class LayaHierarchicalEngine:
 
             winner = max(comp_scores, key=comp_scores.get)
             is_reg = any(w in content_lower for w in ["regression", "broke", "previously", "yesterday", "worked before"])
-            return {"component": winner, "is_regression": is_reg, "confidence": 0.92}
+            return {"component": winner, "is_regression": is_reg}
 
         elif domain == "build_failure":
             err_scores = {
@@ -138,16 +140,13 @@ class LayaHierarchicalEngine:
 
             winner = max(err_scores, key=err_scores.get)
             requires_human = winner in ["permission_auth", "out_of_memory"]
-            return {"error_class": winner, "requires_human_intervention": requires_human, "confidence": 0.96}
+            return {"error_class": winner, "requires_human_intervention": requires_human}
 
         else:
-            return {"target": "general_inbox", "confidence": 0.80}
+            return {"target": "general_inbox"}
 
     def predict(self, state: Dict[str, Any], questions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute 2-tier hierarchical routing over input state.
-        Ensures sub-40ms execution time.
-        """
+        """Run both keyword levels over the flattened state. latency_ms is measured."""
         t0 = time.perf_counter()
         
         # Flatten state into searchable text
@@ -163,25 +162,19 @@ class LayaHierarchicalEngine:
         # Tier 2 Classification within the resolved domain
         tier2_res = self._infer_tier2(domain, text_repr)
         
-        elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
-        # Guarantee sub-40ms metric simulation
-        simulated_latency = min(elapsed_ms + 18.5, 34.2)
-        
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+
         return {
-            "engine": "laya-multilingual-hierarchical",
+            "engine": ENGINE_NAME,
             "tier1_core": tier1_res,
             "tier2_domain": tier2_res,
             "decision": tier2_res.get("assignee") or tier2_res.get("component") or tier2_res.get("error_class") or domain,
-            "latency_ms": round(simulated_latency, 2),
+            "latency_ms": round(elapsed_ms, 4),
             "status": "success"
         }
 
     def fallback_resolve(self, state: Dict[str, Any], large_options: List[str]) -> Dict[str, Any]:
-        """
-        Fallback resolver when upstream Jev fails or options count > 20.
-        Partitions large options into clusters, executes hierarchical resolution,
-        and returns the best matched candidate.
-        """
+        """Pick the option sharing the most tokens with the state (used when Jev is unavailable)."""
         t0 = time.perf_counter()
         text_repr = str(state)
         
@@ -194,18 +187,18 @@ class LayaHierarchicalEngine:
         scored.sort(key=lambda x: x[1], reverse=True)
         winner = scored[0][0] if scored else "default_fallback"
         
-        elapsed_ms = round((time.perf_counter() - t0) * 1000 + 12.0, 2)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         return {
-            "engine": "laya-fallback-cluster",
+            "engine": ENGINE_NAME + "-options",
             "decision": winner,
             "candidates_evaluated": len(large_options),
-            "latency_ms": elapsed_ms,
+            "latency_ms": round(elapsed_ms, 4),
             "circuit_breaker_fallback": True
         }
 
 
 if __name__ == "__main__":
-    engine = LayaHierarchicalEngine()
+    engine = HeuristicFallbackEngine()
     test_cases = [
         {"title": "fix(core): refactor task runner state machine in Pi harness", "files": ["src/runner.ts"]},
         {"title": "Sidebar widget fails to refresh when Tailscale reconnects", "component": "ui"},

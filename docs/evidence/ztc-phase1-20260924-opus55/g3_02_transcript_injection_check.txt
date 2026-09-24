@@ -1,0 +1,7 @@
+# transcript 훅 기록(하네스 측) — ZTC shadow 훅 (statusMessage 'ZTC shadow 기록')
+records: 240 {('hook_success', 'PreToolUse'): 121, ('hook_success', 'PostToolUse'): 119}
+stdout values: {'{}': 240}
+stderr non-empty: 0  exitCode: {0: 240}
+injection fields in shadow hook output: 0
+harness durationMs (full, incl. process start) p50/p95/p99/max: [54.0, 67.0, 70.0] 84.0
+# Tier-2 게이트 훅 기록(비교):  {('hook_non_blocking_error', 'defer/none'): 63, ('hook_success', 'ask'): 6}

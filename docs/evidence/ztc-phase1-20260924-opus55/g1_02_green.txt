@@ -1,0 +1,15 @@
+# G1 GREEN — 2026-09-24 19:33:28 KST, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+test_allowed_commands_defer (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_allowed_commands_defer) ... ok
+test_blocked_commands_ask_in_prompt_modes (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_blocked_commands_ask_in_prompt_modes) ... ok
+test_blocked_commands_deny_in_promptless_modes (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_blocked_commands_deny_in_promptless_modes) ... ok
+test_log_is_repo_relative_not_literal_c_drive (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_log_is_repo_relative_not_literal_c_drive) ... ok
+test_gate_crash (test_tier2_gate_wrapper.TestBrokenGateAsks.test_gate_crash) ... ok
+test_gate_script_missing (test_tier2_gate_wrapper.TestBrokenGateAsks.test_gate_script_missing) ... ok
+test_python_missing (test_tier2_gate_wrapper.TestBrokenGateAsks.test_python_missing) ... ok
+test_claude_settings_command_runs_wrapper (test_tier2_gate_wrapper.TestSettingsCommand.test_claude_settings_command_runs_wrapper) ... ok
+test_codex_hooks_command_uses_wrapper (test_tier2_gate_wrapper.TestSettingsCommand.test_codex_hooks_command_uses_wrapper) ... ok
+Ran 9 tests in 0.488s
+OK
+
+# 실제 worktree 명령 문자열로 1회(임시 로그 위치 아님 — 게이트가 <repo>/learning/remote-approvals/ 에 기록): 허용 명령 ls
+rc=0 stdout 위 빈 줄 = defer

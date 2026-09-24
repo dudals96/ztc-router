@@ -1,0 +1,6 @@
+# G1 실기 증거 — 2026-09-24 19:36:14 KST, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+# 이 세션(Claude Code 2.1.281, permission_mode=auto)이 커밋 5fdcde0 의 settings 변경을 재로드해, 새 래퍼가 실제 Bash 호출에 걸렸다.
+# 출처: learning/remote-approvals/tier2-gate-log.jsonl 신규 행(해시 필드 제외, 명령 앞 60자)
+{"ts": "2026-09-24T19:34:21+09:00", "event": "ask", "mode": "auto", "hit": "rm", "cmd_head": "S=/private/tmp/claude-501/-Users-richardkim-macpro-Pi-wt-ztc"}
+{"ts": "2026-09-24T19:35:27+09:00", "event": "ask", "mode": "auto", "hit": "rm", "cmd_head": "python3 - <<'EOF' import json,datetime s=open(\"biome.json\")."}
+# 해석: Tier-2 토큰 rm 을 포함한 명령 2건이 auto 모드에서 ask 로 판정되어 승인 흐름을 거쳤다(G1 전 Mac 에서는 py 부재 exit 127 로 조용히 통과). Windows 노드·Codex 는 여전히 실기 미확인.

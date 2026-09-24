@@ -1,0 +1,18 @@
+# W1 설치판 문자열 계수 — 2026-09-24 18:50 KST, node richardkim-macpro-macbookpro, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+# 방법: LC_ALL=C grep -a -o <s> <binary> | wc -l (발생 횟수. 09-24 검증 문서의 값은 grep -c 줄 수라 다르다). 문자열 존재 = 기능 후보 증거일 뿐, 실행 의미 증거 아님.
+claude 2.1.281 (Claude Code) /Users/richardkim-macpro/.nvm/versions/node/v24.18.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe
+  updatedToolOutput 38
+  PostToolUseFailure 51
+  permissionDecision 122
+  updatedInput 425
+  additionalContext 200
+  hookSpecificOutput 165
+codex codex-cli 0.156.1 /Users/richardkim-macpro/.nvm/versions/node/v24.18.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex
+  PreToolUse 56
+  PostToolUse 51
+  hooks.json 7
+  hookSpecificOutput 8
+  permissionDecision 13
+  additionalContext 31
+  updatedInput 7
+antigravity: 이 세션에서 앱 번들 미발견(/Applications, ~/Applications). 09-24 검증 문서의 app.asar PreToolUse 0건 기록만 존재 -> 미확인
