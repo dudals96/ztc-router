@@ -1,0 +1,15 @@
+# G2 사전 재현 — 2026-09-24 19:34:41 KST. biome Version: 2.4.14(main 체크아웃 node_modules 바이너리, 읽기 전용 사용)
+# 방법: scratchpad 에 빈 git 저장소 2개 = biome.json(현재|제안) + main 의 .gitignore + .codegraph 심링크(main 과 같은 대상) + sample.json
+# 참고: worktree 자체는 .codegraph 가 없어 현재 설정으로도 'Checked 72 files, 0 errors'. main 체크아웃에서 --config-path 비교는 includes 가 설정 파일 기준 상대경로로 풀려 무효(폐기).
+
+=== current ===
+~/.omo/codegraph/projects/Pi-abd32b37f674aa7c/daemon.sock internalError/fs ━━━━━━━━━━
+~/.omo/codegraph/projects/Pi-abd32b37f674aa7c/source.json format ━━━━━━━━━━━━
+Checked 9 files in 1244µs. No fixes applied.
+Found 1 error.
+Found 1 warning.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== proposed ===
+17:			"!.codegraph"
+Checked 2 files in 1078µs. No fixes applied.

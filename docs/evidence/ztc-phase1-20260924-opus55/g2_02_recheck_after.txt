@@ -1,0 +1,9 @@
+# G2 승인 후 재검증 — 2026-09-24 19:35:51 KST, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55, biome Version: 2.4.14
+# 조건: worktree 에 임시 .codegraph 심링크(main 과 같은 대상, .git/info/exclude 로 git 제외) 존재
+$ git diff biome.json
+-			"!_diag_acc.log"
++			"!_diag_acc.log",
++			"!.codegraph"
+$ biome check .
+Checked 72 files in 45ms. No fixes applied.
+exit=
