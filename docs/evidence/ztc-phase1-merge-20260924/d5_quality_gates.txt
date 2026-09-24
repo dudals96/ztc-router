@@ -1,0 +1,26 @@
+# D5 전체 품질 게이트 — ztc/phase1-merged (e918574 + 이 커밋), 2026-09-24
+node_modules 는 main 체크아웃 것을 임시 심볼릭 링크로 사용(커밋하지 않음).
+
+$ npm run check
+Checked 73 files in 40ms. No fixes applied.
+exit 0
+
+$ npm run secretlint
+exit 0
+
+$ npm run typecheck
+exit 0
+
+$ npm run typecheck:scripts
+exit 0
+
+$ npm run test
+Test Suites: 17 passed, 17 total
+Tests:       99 passed, 99 total
+exit 0
+
+$ python3 -m unittest discover -s engines/hybrid_router/tests -p "test_*.py"
+Ran 120 tests in 18.196s
+OK
+$ python3 tests/test_tier2_gate_hook.py
+ALL PASSED (26/26)
