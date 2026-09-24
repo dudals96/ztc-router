@@ -1,0 +1,28 @@
+# D5 빨강→초록 — test_merge_grafts.py
+
+## 빨강: 접목 전 코드(71160d8)에 새 테스트 적용
+ERROR: test_over_cap_gets_immediate_503 TestConcurrencyCap.test_over_cap_gets_immediate_503)
+ERROR: test_cancel_propagates_to_pending_judge_job TestDaemonGrafts.test_cancel_propagates_to_pending_judge_job)
+ERROR: test_oversize_record_is_dropped TestTelemetryBounds.test_oversize_record_is_dropped)
+FAIL: test_reenable_probe_failure_rearms_the_wait TestClientGrafts.test_reenable_probe_failure_rearms_the_wait)
+FAIL: test_reenable_probe_succeeds_when_daemon_is_back TestClientGrafts.test_reenable_probe_succeeds_when_daemon_is_back)
+FAIL: test_cancel_rejects_bad_request_id TestDaemonGrafts.test_cancel_rejects_bad_request_id)
+FAIL: test_negative_or_signed_content_length_is_400 TestDaemonGrafts.test_negative_or_signed_content_length_is_400)
+FAIL: test_short_body_is_length_mismatch TestDaemonGrafts.test_short_body_is_length_mismatch)
+FAIL: test_success_post_is_not_queued TestDaemonGrafts.test_success_post_is_not_queued)
+FAIL: test_exit_codes_and_signals TestStatusNumbersStayDistinct.test_exit_codes_and_signals)
+FAIL: test_http_status TestStatusNumbersStayDistinct.test_http_status)
+FAIL: test_file_cap_drops_further_writes TestTelemetryBounds.test_file_cap_drops_further_writes)
+FAIL: test_home_inside_repo_is_refused TestTelemetryBounds.test_home_inside_repo_is_refused)
+FAIL: test_symlinked_stream_is_refused TestTelemetryBounds.test_symlinked_stream_is_refused)
+Ran 18 tests in 8.167s
+FAILED (failures=11, errors=3)
+추가: test_existing_home_keeps_its_permissions 를 원장 경로로 강화한 뒤 71160d8 에서 FAIL 1 확인.
+통과 3건(plain counts collapse, young marker not probed, hostile reply neutral)은 기존 동작을 지키는 회귀 방지용.
+
+## 초록: 접목 후 전체
+$ python3 -m unittest discover -s engines/hybrid_router/tests -p "test_*.py"
+Ran 120 tests in 18.187s
+OK
+$ python3 tests/test_tier2_gate_hook.py
+ALL PASSED (26/26)

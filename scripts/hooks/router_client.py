@@ -4,8 +4,9 @@
 stdin JSON -> size/format checks -> masking -> POST /v1/observe on 127.0.0.1 with a
 30 ms internal budget -> one telemetry line in $PI_ROUTER_HOME/telemetry/hook_events.jsonl.
 Auto-disable (plan v0.3 §5.4 S6): if >20% of the last 50 calls failed or ran over budget,
-write $PI_ROUTER_HOME/disabled and stop calling the daemon. Recovery is manual:
-check the cause, delete the marker, re-run the bench.
+write $PI_ROUTER_HOME/disabled and stop calling the daemon. Recovery: once the marker
+is REENABLE_AFTER_SEC old, one call probes the daemon; an in-budget ok removes the marker
+and resets the window, anything else re-arms the wait. Deleting the marker by hand still works.
 """
 
 import signal
@@ -44,6 +45,7 @@ MAX_RESPONSE = 16 * 1024
 WINDOW = 50
 MIN_SAMPLES = 20
 DISABLE_RATE = 0.2
+REENABLE_AFTER_SEC = 60.0
 
 
 def _exit_code(resp):
@@ -145,6 +147,30 @@ def update_window(outcome: str) -> str | None:
     return None
 
 
+def marker_age_sec() -> float:
+    try:
+        ts = float(json.loads(disabled_marker().read_text()).get("ts", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        ts = 0.0
+    return time.time() - ts
+
+
+def write_marker(reason: str) -> None:
+    private_dir(router_home())
+    path = disabled_marker()
+    tmp = path.with_name(f".disabled.{os.getpid()}")
+    tmp.write_text(json.dumps({"reason": reason, "ts": time.time()}))
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+
+
+def reset_window() -> None:
+    try:
+        (router_home() / "client_window.json").unlink()
+    except OSError:
+        pass
+
+
 def main() -> None:
     t_start = time.perf_counter()
     record = {"client_version": CLIENT_VERSION, "request_id": uuid.uuid4().hex[:16]}
@@ -161,8 +187,19 @@ def main() -> None:
             if not isinstance(payload, dict):
                 outcome = "bad_json"
             elif disabled_marker().exists():
-                outcome = "disabled"
                 body = build_body(payload)
+                if marker_age_sec() < REENABLE_AFTER_SEC:
+                    outcome = "disabled"
+                else:
+                    outcome, rpc_ms = rpc(body, t_start + BUDGET_MS / 1000, record["request_id"])
+                    if outcome == "ok":
+                        disabled_marker().unlink(missing_ok=True)
+                        reset_window()
+                        record["auto_reenabled"] = True
+                    else:
+                        write_marker(f"re-enable probe {outcome}")
+                        record["reenable_probe"] = outcome
+                        outcome = "disabled"
             else:
                 body = build_body(payload)
                 outcome, rpc_ms = rpc(body, t_start + BUDGET_MS / 1000, record["request_id"])
@@ -181,10 +218,10 @@ def main() -> None:
         "client_ms": round((time.perf_counter() - t_start) * 1000, 3),
     })
     try:
-        if outcome not in ("disabled", "oversize", "bad_json"):
+        if outcome not in ("disabled", "oversize", "bad_json") and not record.get("auto_reenabled"):
             reason = update_window(outcome)
             if reason and not disabled_marker().exists():
-                disabled_marker().write_text(json.dumps({"reason": reason, "ts": time.time()}))
+                write_marker(reason)
                 record["auto_disabled"] = reason
         telemetry.append("hook_events", record)
     except Exception:

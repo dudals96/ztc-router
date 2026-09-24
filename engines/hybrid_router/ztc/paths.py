@@ -29,8 +29,22 @@ def router_port() -> int:
     return port if 0 < port < 65536 else DEFAULT_PORT
 
 
+def ensure_outside_repo(path: Path) -> Path:
+    """Raw data must never land in the git-tracked tree (grafted from track B)."""
+    resolved = Path(path).expanduser().resolve()
+    root = REPO_ROOT.resolve()
+    if resolved == root or root in resolved.parents:
+        raise PermissionError(f"PI_ROUTER_HOME must resolve outside the repository: {root}")
+    return resolved
+
+
 def private_dir(path: Path) -> Path:
-    """Create path and any missing parents with 0700 (mkdir's mode skips parents) and return it."""
+    """Create path and any missing parents with 0700 and return it.
+
+    Only directories created here are chmod-ed; an existing directory (for example a
+    mistaken PI_ROUTER_HOME=$HOME) keeps its permissions. Refuses paths inside the repo.
+    """
+    ensure_outside_repo(path)
     missing = []
     probe = path
     while not probe.exists():
@@ -39,7 +53,6 @@ def private_dir(path: Path) -> Path:
     for d in reversed(missing):
         d.mkdir(mode=0o700, exist_ok=True)
         os.chmod(d, 0o700)
-    os.chmod(path, 0o700)
     return path
 
 

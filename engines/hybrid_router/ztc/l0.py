@@ -28,6 +28,11 @@ _LINE_WORD = re.compile(r"(?i)\bline \d+")
 _HEX = re.compile(r"\b(?:0x)?[0-9a-f]{7,}\b", re.I)
 _NUM = re.compile(r"\b\d+\b")
 _TS_CODE = re.compile(r"\bTS\d{4}\b")
+# Status-like numbers carry meaning (HTTP 404 vs 500, exit 1 vs 137); keep them.
+_KEEP_NUM = re.compile(
+    r"(?i)\b((?:HTTP(?:/\d(?:\.\d)?)?|status|code|errno|signal|exit(?:\s+(?:code|status))?)\s*[:=]?\s*)(\d{1,3})\b"
+)
+_KEPT = re.compile(r"ZQ(\d{1,3})ZQ")
 _WS = re.compile(r"\s+")
 
 
@@ -57,11 +62,13 @@ def classify_regex(text: str, compiled) -> str | None:
 def normalize_line(line: str) -> str:
     """Replace volatile parts; keep identifiers so distinct errors stay distinct."""
     keep_codes = _TS_CODE.findall(line)
+    line = _KEEP_NUM.sub(lambda m: f"{m.group(1)}ZQ{m.group(2)}ZQ", line)
     line = _PATH.sub("<PATH>", line)
     line = _LINE_COL.sub(":<N>", line)
     line = _LINE_WORD.sub("line <N>", line)
     line = _HEX.sub("<HEX>", line)
     line = _NUM.sub("<N>", line)
+    line = _KEPT.sub(r"\1", line)
     for code in keep_codes:  # TS error codes carry meaning; restore them
         line = line.replace("TS<N>", code, 1)
     return _WS.sub(" ", line).strip()
