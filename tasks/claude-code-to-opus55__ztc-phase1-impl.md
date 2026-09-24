@@ -1,3 +1,12 @@
+> **병렬 초안 모드 (2026-09-24 유저 결정, 이 블록이 본문보다 우선)**
+> 같은 의도를 Opus 5.5 와 Luna 가 각자 초안으로 구현하고, 유저가 장단점을 합쳐 머지한다. 규약: `tasks/ztc-phase1-dual-draft__merge-protocol.md` (먼저 읽어라).
+> - 트랙 A: Opus 5.5. 작업 위치는 worktree `~/Pi-wt/ztc-opus55`, 브랜치 `ztc/phase1-opus55`. 본문의 `~/Pi`·`/Users/richardkim-macpro/Pi` 는 이 worktree 로 읽는다. `main` 커밋·push 금지.
+> - 원자료 루트 `~/.pi-router/opus55/`, 데몬 포트 9877. 본문의 `~/.pi-router/`·9876 은 이 값으로 바꿔 읽는다. 포트·루트는 `PI_ROUTER_PORT`·`PI_ROUTER_HOME` 환경변수로 받게 구현한다(기본값 9876·`~/.pi-router`).
+> - 증거 `docs/evidence/ztc-phase1-<YYYYMMDD>-opus55/`, council entry `docs/turn-reports/<YYYY-MM-DD>_<Day>/<YYYY-MM-DD>_claude-code-opus55_ztc-phase1-<slug>.md`.
+> - 세션 복구는 worktree 에서 `pwsh -File scripts/session-recover.ps1` (`-Pull` 없이).
+> - 구현 소유권은 유저가 두 트랙 병행으로 확정했다. 상대 트랙 브랜치·worktree·원자료는 초안 동결 전까지 읽지 않는다. 벤치 수치는 잠정값이다.
+> - 도달 가능한 마지막 정지점에서 멈추고 마지막 커밋 해시를 council entry 에 적는다(동결 D2).
+
 # ZTC Phase 1 구현 지시문 — Opus 5.5 (발주: 2026-09-24, Claude Code Fable 5.1 @ richardkim-macpro-macbookpro)
 
 실행 환경: Claude Code CLI, model claude-opus-5-5, 노드 richardkim-macpro-macbookpro, 저장소 ~/Pi (터미널 세션). 다른 노드·다른 IDE 에서 열었다면 첫 줄에 그 사실을 밝히고 멈춰라.
