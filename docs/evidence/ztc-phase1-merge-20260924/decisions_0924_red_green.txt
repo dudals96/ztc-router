@@ -1,0 +1,12 @@
+# 유저 결정 4건 반영 — 빨강→초록
+## 빨강: 변경 전 코드(d76c8a7)에 test_decisions_0924.py
+ERROR: test_default_is_14_days
+ERROR: test_prune_drops_only_records_older_than_14_days
+ERROR: test_prune_skips_symlinks
+FAIL: test_exit_code_line_is_parsed_and_stripped
+FAIL: test_tail_is_kept_for_long_output
+Ran 7 tests in 2.405s
+FAILED (failures=2, errors=3)
+통과 2건(bare message, secret masking)은 회귀 방지.
+## 초록
+npm check·secretlint·typecheck·typecheck:scripts·test 전부 exit 0; unittest 127 OK; tier2 26/26

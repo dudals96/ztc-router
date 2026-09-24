@@ -59,3 +59,42 @@ def percentile(values: list[float], q: float) -> float | None:
     ordered = sorted(values)
     rank = max(1, min(len(ordered), round(q / 100 * len(ordered) + 0.5)))
     return ordered[rank - 1]
+
+
+RETENTION_DAYS = 14  # user decision 2026-09-24 (EVAL_PROTOCOL_ztc.md §0)
+
+
+def prune(max_age_days: float = RETENTION_DAYS, now: float | None = None) -> dict:
+    """Drop telemetry records older than max_age_days from every stream.
+
+    Each stream is rewritten atomically (0600 temp file + rename). Symlinks are skipped.
+    Lines without a numeric ts are kept (they are not ours to judge). Returns counts.
+    """
+    cutoff = (time.time() if now is None else now) - max_age_days * 86400
+    result = {"streams": 0, "kept": 0, "dropped": 0, "skipped_symlinks": 0}
+    for path in sorted(telemetry_dir().glob("*.jsonl")):
+        if path.is_symlink():
+            result["skipped_symlinks"] += 1
+            continue
+        kept, dropped = [], 0
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                try:
+                    ts = json.loads(line).get("ts")
+                except (json.JSONDecodeError, AttributeError):
+                    ts = None
+                if isinstance(ts, (int, float)) and ts < cutoff:
+                    dropped += 1
+                else:
+                    kept.append(line if line.endswith("\n") else line + "\n")
+        result["streams"] += 1
+        result["kept"] += len(kept)
+        result["dropped"] += dropped
+        if not dropped:
+            continue
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.writelines(kept)
+        os.replace(tmp, path)
+    return result

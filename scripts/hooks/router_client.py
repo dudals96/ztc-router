@@ -35,7 +35,8 @@ from pathlib import Path  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "engines" / "hybrid_router"))
 from ztc import telemetry  # noqa: E402
-from ztc.masking import mask_cwd, mask_text  # noqa: E402
+from ztc.masking import MAX_TEXT, mask_cwd, mask_text  # noqa: E402
+import re  # noqa: E402
 from ztc.paths import BIND_HOST, disabled_marker, private_dir, router_home, router_port  # noqa: E402
 
 CLIENT_VERSION = "ztc-phase1-0.1"
@@ -45,6 +46,7 @@ MAX_RESPONSE = 16 * 1024
 WINDOW = 50
 MIN_SAMPLES = 20
 DISABLE_RATE = 0.2
+EXIT_LINE = re.compile(r"^Exit code (\d{1,3})\s*$")
 REENABLE_AFTER_SEC = 60.0
 
 
@@ -76,9 +78,20 @@ def build_body(payload: dict) -> dict:
     elif isinstance(resp, str) and event == "PostToolUseFailure":
         text = resp
     if event == "PostToolUseFailure" and not text:
-        text = str(payload.get("error", ""))
+        # hooks reference: Bash failures arrive as `error` = "Exit code N\n<stdout+stderr>";
+        # a bare message without that line means the shell could not start.
+        error = payload.get("error") if isinstance(payload.get("error"), str) else ""
+        first, _, rest = error.partition("\n")
+        m = EXIT_LINE.match(first)
+        if m:
+            code = int(m.group(1)) if code is None else code
+            text = rest
+        else:
+            text = error
+        body["interrupt"] = payload.get("is_interrupt") is True
     body["exit_code"] = code
-    body["text"] = mask_text(text, cwd=cwd)
+    # the failing line is usually at the end: mask a wide tail first, then keep its last MAX_TEXT chars
+    body["text"] = mask_text(text[-4 * MAX_TEXT:], cwd=cwd, limit=4 * MAX_TEXT)[-MAX_TEXT:]
     body["response_keys"] = sorted(resp.keys())[:20] if isinstance(resp, dict) else None
     return body
 

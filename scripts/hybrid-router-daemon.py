@@ -38,6 +38,7 @@ MAX_BODY_BYTES = 64 * 1024
 HANDLER_SOCKET_TIMEOUT_SEC = 2.0
 MAX_CONCURRENT_REQUESTS = 16  # beyond this: immediate 503 (bound grafted from track B)
 CANCEL_MAP_SIZE = 256
+PRUNE_INTERVAL_SEC = 6 * 3600  # telemetry retention sweep (14 days, ztc.telemetry.RETENTION_DAYS)
 LATENCY_WINDOW = 2000
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 KNOWN_ERROR_CLASSES = {"syntax_compile", "dependency_missing", "lint_formatting", "permission_auth",
@@ -328,10 +329,23 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    stop_pruning = threading.Event()
+
+    def prune_loop():
+        while True:
+            try:
+                telemetry.prune()
+            except OSError:
+                state.bump("errors")
+            if stop_pruning.wait(PRUNE_INTERVAL_SEC):
+                return
+
+    threading.Thread(target=prune_loop, name="ztc-retention", daemon=True).start()
     print(f"[ztc-router] listening on http://{host}:{port} (home {router_home()}, policy {state.policy})", flush=True)
     try:
         server.serve_forever()
     finally:
+        stop_pruning.set()
         server.server_close()
         state.close()
         print("[ztc-router] stopped", flush=True)

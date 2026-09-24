@@ -29,11 +29,11 @@
 | PreToolUse | 〃 | `hookSpecificOutput.additionalContext` | 지원 | [문서-ref], [설치판] 200 | **금지** |
 | PostToolUse | JSON(`tool_name`, `tool_input`, `tool_response` …) | 중립 반환 `{}` | 지원 | [문서-ref] | **사용 — 유일한 반환값** |
 | PostToolUse | 〃 | `additionalContext`, `decision` | 지원 | [문서-ref] | **금지** |
-| PostToolUse | 〃 | `updatedToolOutput` | **미확인** — 트랙 A 조회: Agent SDK 문서는 "any tool in both SDKs", hooks 레퍼런스 Decision control 표에는 없음. 트랙 B 조회: hooks 레퍼런스가 PostToolUse `updatedToolOutput` 을 기술한다. **트랙 간 문서 판독 불일치 → 재조회 필요.** 설치판 동작은 어느 쪽도 미검증 | [문서-sdk], [문서-B], [설치판] 38 | **금지.** 실측 fixture 작성만 허용 |
+| PostToolUse | 〃 | `updatedToolOutput` | **문서화됨** — 2026-09-24 재조회: hooks 레퍼런스 PostToolUse 결정 표에 "Replaces the tool's output … before it is sent to Claude"(원문 2041행). 트랙 A 의 "표에 없음" 은 옛 판독. **설치판 동작은 미검증** | [문서-ref] `docs/evidence/ztc-phase1-merge-20260924/hooks_reference_recheck_20260924.md`, [설치판] 38 | **금지** (shadow). 실측 fixture 작성만 허용 |
 | PostToolUse (Bash) | `tool_response` 키 | `interrupted`, `isImage`, `noOutputExpected`, `stderr`, `stdout` — **종료 코드 필드 없음** | [실측] G3 shadow 101건(`docs/evidence/ztc-phase1-20260924-opus55/g3_01_hook_events_summary.txt`) | 클라이언트는 종료 코드를 `null` 로 기록 |
-| PostToolUseFailure | JSON | 이벤트 존재 | 지원 | [문서-guide](09-24 검증 세션 조회), [설치판] 51 | Phase 1 미등록 |
-| PostToolUseFailure | 〃 | `additionalContext` | **미확인** (레퍼런스 표에 없음) | — | 금지 |
-| PostToolUseFailure | 〃 | 출력 교체 | **미확인** — PostToolUse 의 필드를 확대 해석하지 않는다 | — | 금지 |
+| PostToolUseFailure | `tool_name`·`tool_input`·`tool_use_id` + `error`(Bash 는 첫 줄 `Exit code N` 뒤 stdout·stderr 섞인 출력, 긴 문자열은 가운데 잘림), 선택 `is_interrupt`·`duration_ms` | 중립 반환 `{}` | 지원 | [문서-ref] `docs/evidence/ztc-phase1-merge-20260924/hooks_reference_recheck_20260924.md` §3 | **사용 — 2026-09-24 유저 결정으로 등록.** 클라이언트가 `Exit code N` 을 종료 코드로, 나머지 끝부분 500자를 본문으로 |
+| PostToolUseFailure | 〃 | `additionalContext` | 문서화됨(결정 표) | [문서-ref] | **금지** (shadow) |
+| PostToolUseFailure | 〃 | 출력 교체 | 이 이벤트 결정 표에는 `additionalContext` 만 있다 | [문서-ref] | 금지 |
 | 실패한 Bash(exit≠0) 의 이벤트 | — | **PostToolUse 는 발화하지 않는다**(PreToolUse 만 기록). PostToolUseFailure 로 가는지는 미등록이라 미관측 | [실측] G3 2건 | Phase 1 shadow 는 실패 본문을 보지 못한다 → L0 입력을 받으려면 PostToolUseFailure 등록(별도 승인) |
 | 하네스가 기록하는 훅 결과 | transcript attachment `hook_success` 에 `stdout`·`exitCode`·`durationMs`·`command`(=statusMessage) | — | [실측] | 주입 검사·전체 지연(K1 full)의 근거로 사용 |
 | 훅 조합: 다른 훅의 `updatedInput` 과 병합 순서 | — | **미확인** | — | shadow 는 입력을 바꾸지 않으므로 Phase 1 영향 없음 |
@@ -42,7 +42,7 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | `timeout` 단위 | 초 | [문서-ref] |
-| 기본값 | 600 s (command/http/mcp_tool) | [문서-ref]. 트랙 B 는 PreToolUse 기본을 30 s 로 기재([문서-B]) — **불일치, 재조회 필요.** 머지본 설정은 기본값에 의존하지 않고 `timeout` 을 명시한다 |
+| 기본값 | 600 s (command/http/mcp_tool). 30 s 로 낮추는 이벤트는 UserPromptSubmit·PreModelSwitch·PostModelSwitch 뿐, PreToolUse 는 해당 없음 | [문서-ref] 원문 430행, `docs/evidence/ztc-phase1-merge-20260924/hooks_reference_recheck_20260924.md`. 트랙 B 의 "PreToolUse 30 s" 는 틀림(2026-09-24 재조회로 해소). 설정은 기본값에 의존하지 않고 `timeout` 을 명시한다 |
 | command/http/mcp_tool 훅 타임아웃 시 | 도구 호출을 막지 않는다. 정상 권한 흐름이 계속된다 | [문서-ref] "A timed-out `command`, `http`, or `mcp_tool` hook doesn't block the tool call…" |
 | Agent SDK 콜백 훅 타임아웃 시 | 도구 호출을 막는다 | [문서-ref] 같은 절. **CLI command 훅에는 해당 없음** |
 | 30 ms 예산 | 하네스가 아니라 **훅 클라이언트가 자체 강제**한다 | 설계(계획 §4) |
@@ -102,11 +102,11 @@
 | 항목 | 확인 방법 | 시점 |
 |---|---|---|
 | PostToolUse Bash `tool_response` 필드 | G3 등록 후 첫 표본(마스킹 후 키 이름만 기록) | W3 |
-| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | 트랙 A G3 실측: 실패한 Bash 는 PostToolUse 미발화. PostToolUseFailure 등록 후 페이로드 1회 실측 | **유저 결정 대기** (등록 여부) |
+| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | 트랙 A G3 실측: 실패한 Bash 는 PostToolUse 미발화. 문서: PostToolUseFailure 는 "After a tool call fails". **등록 완료(2026-09-24).** 설치판 페이로드 첫 실측 필요 | 등록 직후 |
 | `updatedToolOutput` CLI 지원 | 격리 fixture 세션에서만. 공유 settings 에 넣지 않는다 | Phase 2 전 |
 | Codex hooks.json 실행 | Codex 세션에서 무해 훅(파일 1행 기록) 실측 | Phase 2 이후, 별도 승인 |
 | Antigravity | [문서-B] 확보됨. 설치판 fixture 후 | 미정 |
-| 트랙 간 문서 판독 불일치 2건(PreToolUse 기본 timeout, `updatedToolOutput` 기재 여부) | hooks 레퍼런스 재조회 1회, 인용문을 증거 폴더에 저장 | Phase 2 전 |
+| 트랙 간 문서 판독 불일치 2건 | **해소(2026-09-24)** — 원문 직접 조회, `docs/evidence/ztc-phase1-merge-20260924/hooks_reference_recheck_20260924.md`. WebFetch 요약은 원문에 없는 필드를 지어내 증거로 쓰지 않았다 | 완료 |
 
 ## 6. 운영 절차 — 자동 비활성·복귀·원복 (머지본 기준)
 | 상황 | 동작 | 사람이 할 일 |
@@ -116,8 +116,8 @@
 | 최근 50 호출 중 실패·예산 초과 > 20% (표본 ≥ 20) | `$PI_ROUTER_HOME/disabled` 표지 생성, 이후 데몬 호출 없이 `{}` + outcome `disabled` | 원인 확인(아래) |
 | 자동 복귀 (머지본에서 추가) | 표지가 60초 이상 지나면 다음 호출 1회가 시험 호출. 예산 안 `ok` 면 표지·창 삭제(`auto_reenabled`), 아니면 표지 시각만 갱신(`reenable_probe`) | 반복되면 `hook_events.jsonl` 의 실패 분포 확인 후 원인 조치. 표지 수동 삭제도 계속 유효 |
 | 취소 전파 | 데몬 `POST /v1/cancel {"request_id"}` 가 그 요청으로 큐에 들어간 판정 작업을 제거. 현 클라이언트는 호출하지 않는다(취소는 프로세스 종료로 끝남, 큐 TTL 30 s) | — |
-| 원자료 안전 | `PI_ROUTER_HOME` 이 저장소 안이면 쓰기 거부. 레코드 8 KiB·파일 5 MiB 초과분은 버림. symlink 스트림 거부 | 5 MiB 도달 시 보존 절차(EVAL §0.1)대로 정리 |
-| 원복(훅 제거) | settings 의 router-client 항목 삭제 → 즉시 무효. **머지본 main 에는 등록돼 있지 않다**(D4 결정) | 데몬 종료(`kill <pid>`), 원자료 보존 여부 결정 |
+| 원자료 안전 | `PI_ROUTER_HOME` 이 저장소 안이면 쓰기 거부. 레코드 8 KiB·파일 5 MiB 초과분은 버림. symlink 스트림 거부. 데몬이 시작 시·6시간마다 14일 지난 레코드 삭제 | 5 MiB 도달 시 보존 절차(EVAL §0.1)대로 정리 |
+| 원복(훅 제거) | `.claude/settings.json` 의 router-client 항목 3개(PreToolUse·PostToolUse·PostToolUseFailure) 삭제 → 즉시 무효. **main 등록은 2026-09-24 유저 결정**(기본 포트 9876·`~/.pi-router`) | 데몬 종료(`kill <pid>`), 원자료는 14일 보존 후 자동 정리 |
 
 코드 위치: 클라이언트 `scripts/hooks/router-client.sh` + `router_client.py`(상수 `WINDOW=50`, `MIN_SAMPLES=20`, `DISABLE_RATE=0.2`, `BUDGET_MS=30`, `REENABLE_AFTER_SEC=60`), 데몬 `scripts/hybrid-router-daemon.py`(`MAX_CONCURRENT_REQUESTS=16`), 원자료 `engines/hybrid_router/ztc/telemetry.py`·`paths.py`, LaunchAgent 템플릿 `config/launchd/com.pi.router-daemon.plist.template`(등록 안 함).
 
