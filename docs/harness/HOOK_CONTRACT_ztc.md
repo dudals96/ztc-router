@@ -29,11 +29,12 @@
 | PostToolUse | JSON(`tool_name`, `tool_input`, `tool_response` …) | 중립 반환 `{}` | 지원 | [문서-ref] | **사용 — 유일한 반환값** |
 | PostToolUse | 〃 | `additionalContext`, `decision` | 지원 | [문서-ref] | **금지** |
 | PostToolUse | 〃 | `updatedToolOutput` | **미확인** — Agent SDK 문서는 "any tool in both SDKs", hooks 레퍼런스 Decision control 표에는 없음. 문서 간 불일치 | [문서-sdk], [설치판] 38 | **금지.** 실측 fixture 작성만 허용 |
-| PostToolUse (Bash) | `tool_response` 안의 종료 코드 필드 이름·유무 | **미확인** | — | 실제 stdin 은 G3 등록 후 첫 표본으로 확인. 그 전 클라이언트는 `exit_code`/`exitCode`/`returncode` 를 관대하게 읽고, 없으면 `null` 로 기록 |
+| PostToolUse (Bash) | `tool_response` 키 | `interrupted`, `isImage`, `noOutputExpected`, `stderr`, `stdout` — **종료 코드 필드 없음** | [실측] G3 shadow 101건(`docs/evidence/ztc-phase1-20260924-opus55/g3_01_hook_events_summary.txt`) | 클라이언트는 종료 코드를 `null` 로 기록 |
 | PostToolUseFailure | JSON | 이벤트 존재 | 지원 | [문서-guide](09-24 검증 세션 조회), [설치판] 51 | Phase 1 미등록 |
 | PostToolUseFailure | 〃 | `additionalContext` | **미확인** (레퍼런스 표에 없음) | — | 금지 |
 | PostToolUseFailure | 〃 | 출력 교체 | **미확인** — PostToolUse 의 필드를 확대 해석하지 않는다 | — | 금지 |
-| 실패가 PostToolUse 와 PostToolUseFailure 중 어디로 가는가 (Bash exit≠0) | — | **미확인** | — | G3 후 실측 항목 |
+| 실패한 Bash(exit≠0) 의 이벤트 | — | **PostToolUse 는 발화하지 않는다**(PreToolUse 만 기록). PostToolUseFailure 로 가는지는 미등록이라 미관측 | [실측] G3 2건 | Phase 1 shadow 는 실패 본문을 보지 못한다 → L0 입력을 받으려면 PostToolUseFailure 등록(별도 승인) |
+| 하네스가 기록하는 훅 결과 | transcript attachment `hook_success` 에 `stdout`·`exitCode`·`durationMs`·`command`(=statusMessage) | — | [실측] | 주입 검사·전체 지연(K1 full)의 근거로 사용 |
 | 훅 조합: 다른 훅의 `updatedInput` 과 병합 순서 | — | **미확인** | — | shadow 는 입력을 바꾸지 않으므로 Phase 1 영향 없음 |
 
 ### 1.2 타임아웃 의미 (Claude Code)
