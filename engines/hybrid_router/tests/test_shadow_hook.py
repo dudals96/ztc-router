@@ -121,6 +121,7 @@ class TestShadowHookFixtures(unittest.TestCase):
         rows = [json.loads(line) for line in log_text.splitlines()]
         self.assertEqual([row["intervention_type"] for row in rows], ["PreToolUse", "PostToolUse"])
         self.assertEqual({row["request_id"] for row in rows}, {"toolu_call_01"})
+        secret = "_".join(("sk", "test", "NeverLogThis1234567890abcdef"))
         for sensitive_value in (secret, "alice", "private-project", "a.py", "result.json", "alice@example.com"):
             self.assertNotIn(sensitive_value, log_text)
         self.assertEqual(stat.S_IMODE(log_path.stat().st_mode), 0o600)
