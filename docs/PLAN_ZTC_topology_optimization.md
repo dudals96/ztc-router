@@ -1,241 +1,236 @@
-# PLAN — Pi 토폴로지 ZTC 고도화 · 분산 추측 실행 체계 구축 (실행 계획 초안 v0.1)
+# PLAN — Pi 토폴로지 ZTC 고도화 · 추측 실행 체계 구축 (실행 계획 v0.2)
 
-- Status: **DRAFT v0.1 — 유저 승인 대기** (§9 의 결정 항목이 확정되기 전에는 Phase 1 착수만 가능)
-- 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro, 2026-09-23
-- 발주: 유저 지시문 "Pi 토폴로지 생산성 극대화 및 ZTC 기반 분산 라우터 고도화 프로젝트 실행 계획 수립 요청" (원문: `learning/user-prompts/2026-09-23_Wed/04_ztc-topology-plan-request.md`)
+- Status: **DRAFT v0.2 — 2인 독립 검토 반영, 유저 승인 대기** (§10 결정 항목 확정 전 착수 불가)
+- 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro. v0.1 2026-09-23 → v0.2 2026-09-24
+- 발주: 유저 지시문 (원문: `learning/user-prompts/2026-09-23_Wed/04_ztc-topology-plan-request.md`); v0.2 는 유저 지시 "다른 에이전트 관점 검토 후 개선" (`learning/user-prompts/2026-09-24_Thu/03_review-then-astra-handoff.md`)
+- 검토 원문(증거): `docs/evidence/ztc-plan-review-20260924/codex-review.md` (Codex, 읽기 전용 샌드박스), `docs/evidence/ztc-plan-review-20260924/claude-reviewer.md` (Claude 독립 리뷰어, 분산·보안·비용 관점)
 - 참조: `docs/PROJECT_BRIEF.md`, `ai_guidelines.md`, `docs/AGENT_COUNCIL_PROTOCOL.md`, `engines/hybrid_router/`, `scripts/decision-gate-interceptor.py`, NV `docs/harness/PLAN_C2_worker_loop_20260922.md`, NV `docs/harness/NORTH_STAR.md`
 
 ---
 
 ## 0. 쉬운 말로 (ai_guidelines §8 자동 발동)
 
-식당 주방에 비유하면 지금 상황은 이렇다. 손님(코딩 에이전트)이 주문할 때마다 셰프(LLM)가 처음부터 생각해서 요리하면 느리고 비싸다. 그래서 주방 입구에 **주문 접수원(Laya 라우터)** 을 세워 "이건 늘 나오는 메뉴니까 셰프 부르지 말고 바로 내보내" 라고 판단하게 만들었다. 그런데 지금 접수원은 진짜 훈련된 접수원이 아니라 **메뉴판 키워드를 눈으로 훑는 아르바이트생**이고, "18ms 만에 판단했다" 는 명찰은 실제 시간이 아니라 명찰에 미리 인쇄된 숫자다. 이 계획의 첫 단계는 스톱워치로 실제 시간을 재는 것이다.
+식당 주방 입구에 "늘 나오는 주문은 셰프(LLM) 안 부르고 바로 내보내는 접수원"(라우터) 을 세웠다고 했는데, 두 명의 외부 감사가 와서 본 결과는 이렇다. 첫째, 그 접수원은 **아직 출근 명부에 없다** — 어떤 에이전트의 훅에도 연결돼 있지 않아 실제로는 아무 주문도 받은 적이 없다. 둘째, 명찰의 "18ms" 뿐 아니라 벽에 걸린 "800배 빠름·99.8% 절감" 포스터도 전부 인쇄물이다. 셋째, 우리가 "훈련된 접수원(진짜 Laya 모델)" 을 데려오려던 비용(수 GB)은 지금 이 가게 규모(처방 4종, 표본 15건)에 맞지 않는다.
 
-두 번째 단계는 접수원을 **4단 계단**으로 바꾸는 것이다. ① 똑같은 주문은 장부를 보고 0초에 처리, ② 비슷한 주문은 냄새(임베딩)로 5ms 안에, ③ 애매하면 훈련된 접수원(진짜 Laya 모델) 이 30ms 안에, ④ 그래도 모르면 셰프. 세 번째 단계는 **손님이 다음에 뭘 시킬지 미리 예측해서 보조 주방(Windows 노드)에 재료 손질을 시켜 두는 것**(추측 실행)이다. 단, 이 집 규칙상 보조 주방은 사장님 도장이 찍힌 주문서 없이는 칼을 들 수 없다. 그래서 "도장 한 번으로 허용되는 손질 목록" 을 먼저 정해야 한다.
+그래서 v0.2 는 계획을 **줄였다.** ① 접수원을 명부에 올리고(훅 배선) 문을 안쪽으로만 연다(로컬 바인드). ② 인쇄된 숫자를 전부 떼고 스톱워치만 남긴다. ③ 접수원은 당분간 **규칙표 한 장(정규식)** 으로 일하고, 그것으로 못 푸는 주문이 얼마나 되는지 센 뒤에야 훈련된 접수원을 부를지 정한다. ④ "다음 주문 미리 손질"(추측 실행)은 보조 주방(Windows)이 아니라 **같은 주방 뒷자리(Mac 로컬 워커)** 에서 먼저 한다. 사장님 도장 규칙을 바꾸지 않아도 되기 때문이다. 보조 주방으로 넓히는 것은 뒷자리에서 실제로 히트율이 나온 뒤, 별도 보안 심사를 거쳐 결정한다.
 
 ---
 
-## 1. 현황 실측 — 계획의 출발점 (2026-09-23, 이 세션에서 비파괴 실측)
+## 1. 현황 실측 · 코드 진실표 (2026-09-23 실측 + 2026-09-24 검토 검증)
 
-계획의 KPI 는 **문서에 적힌 숫자가 아니라 실측값**을 기준선으로 삼는다. 이번 세션에서 확인한 사실:
-
-| 항목 | 문서·코드가 주장하는 값 | 실측/확인 결과 | 근거 |
+| 항목 | 문서·코드가 주장하는 값 | 검증 결과 | 근거 |
 |---|---|---|---|
-| Laya 추론 엔진 | ModernBERT/mmBERT 단일 forward pass, 18.5 ms | **키워드 휴리스틱 시뮬레이션**. 순수 연산 **0.003 ms**. `latency_ms` 는 `min(elapsed+18.5, 34.2)` 상수 | `engines/hybrid_router/hierarchical_routing/hierarchical_engine.py:180` |
-| 라우터 파이프라인 지연 | ≤ 38.5 ms | `min(total, 38.5)` 로 **상한 캡 처리**된 값 | `engines/hybrid_router/router_core.py:73` |
-| 인터셉터 훅 왕복 | 18 ms | **57.7 ms p50**(데몬 다운·로컬 폴백 경로). 내역: Python 기동 17.4 ms + 표준 import 35 ms + 나머지 | 스크래치패드 실측 7회 중앙값 |
-| 데몬(9876) | 상시 가동 | **현재 미가동**, launchd 미등록 | `pgrep -fl hybrid-router` 없음, `~/Library/LaunchAgents` 에 항목 없음 |
-| 절감 토큰 | 155,500 tokens 누적 | 이벤트 15건 × 설정 상수(8,500 / 12,000). **측정값 아님** | `config/anti_pattern_rules.json` `tokens_saved_estimate` |
-| 실제 Laya 패키지 | `engines/laya/` 클론(Apache-2.0) | 요구 Python ≥ 3.10, torch 2.14, transformers 5.x. 현 기본 python3 = 3.14, **torch 미설치**. python3.11 존재 | `engines/laya/README.md`, `which python3` |
-| Prompt Cache 히트율 | 목표 "최대 90% 절감" | 최근 11개 Claude Code 세션 합산 **cache_read 95.8%** (cache_creation 10.7M / cache_read 246.7M / 비캐시 입력 42K tokens) | `~/.claude/projects/-Users-richardkim-macpro-Pi/*.jsonl` usage 필드 집계 |
-| Tailnet 4노드 | 도달 가능 | 4노드 모두 tailscale status 표기. RTT 는 09-22 UTR 기준 16.8~24.7 ms | `Tailscale status` |
-| M5 메모리 | — | 16 GB 통합 메모리 (Laya 상주 ~1.5 GB 여유 있음) | `sysctl hw.memsize` |
-| C2 큐 계약 | — | `job-contract.cjs` 는 fixture 프로젝트·`wait/write/fail` 연산만 허용(schemaVersion 1). **모든 작업은 유저 ed25519 서명(암호구절 TTY) 필수** | NV `scripts/fleet/job-contract.cjs`, PLAN_C2 §1 |
-| Windows 노드 워커 | — | i7: WSL2 + node24 + `/srv/nv-worker` 준비, **스케줄러 미등록**. Site1: RAM 여유 0.62 GB. NVG: 16 GB, Kepler GPU | 메모리 `i7-d1-wsl2-worker-state`, 09-22 UTR |
+| 인터셉터 훅 배선 | PreToolUse/PostToolUse 훅으로 가동 | **어떤 에이전트에도 미배선.** 등록된 PreToolUse 는 `py c:/Pi/scripts/tier2-gate-hook.py` 뿐(Windows 경로, Mac 에서 미실행). 인터셉터는 argparse CLI 이며 stdin JSON 훅 프로토콜이 아님 | `.claude/settings.json:98-133`, `.codex/hooks.json`, `scripts/decision-gate-interceptor.py:211-217` |
+| Laya 추론 엔진 | ModernBERT/mmBERT 단일 forward pass, 로짓 기반 확신도 게이팅 | **키워드 휴리스틱.** 순수 연산 0.003 ms. `latency_ms` 는 `min(elapsed+18.5, 34.2)`(`:168`), 폴백 `+12.0`(`:197`). 확신도로 분기하는 코드 없음 | `hierarchical_engine.py:35-64,168,197` |
+| 라우팅 정책 파일 | `config/routing_policy.json` 이 규칙 정본 | 라우터는 루트 `routing_policy.json` 을 읽지만 **한 번도 사용하지 않음**(규칙은 `:49-55` 하드코딩). `config/` 사본은 바이트 동일한 죽은 파일 | `router_core.py:24,26,49-55`, `cmp` IDENTICAL |
+| 라우터 파이프라인 지연 | ≤ 38.5 ms | `min(total, 38.5)` 상한 캡 | `router_core.py:74` |
+| 인터셉터 지연 | 18 ms | `+18.0`(`:120`), `+18.2`(`:174`) 상수. CLI 왕복 실측 57.7 ms p50(Python 기동 17.4 + import 35) — 단, 훅 미배선이라 **기준선 자격 없음** | `decision-gate-interceptor.py:120,174`, 09-23 스크래치 실측 |
+| Jev 게이트웨이 | 상용 API + 서킷 브레이커 | **HTTP 호출 없음.** `time.sleep(0.045)` 후 키워드 점수, `confidence: 0.98` 상수. 브레이커 테스트는 `force_fail=True` 자기 주입 | `jev_client.py:14,127,143` |
+| 대시보드 문구 | "18ms 추론", "800배+", "99.8% 시간·100% 토큰 절감" | 하드코딩 문자열 | `hybrid-router-daemon.py:227,232,256` |
+| 데몬 노출 | 로컬 서비스 | `0.0.0.0:9876` 무인증, `/health` 는 항상 `ready`, `/telemetry` 가 개입 로그의 명령 문자열을 네트워크에 노출, 단일 스레드 | `hybrid-router-daemon.py:71-84,86-120,369` |
+| 데몬 가동(Mac) | 상시 | 09-23 기준 미가동·launchd 미등록. i7 UTR 의 "active" 는 다른 노드·시점 | `pgrep`, `~/Library/LaunchAgents` |
+| 절감 토큰 155,500 | 누적 실적 | 이벤트 15건 × 설정 상수(8,500/12,000) | `anti_pattern_rules.json:24,69` |
+| 기존 테스트 8/8 | 품질 보증 | `latency_ms <= 40` 과 시뮬 Jev 판정을 단언 → 상수 제거 시 깨짐. "통과 유지" = 시뮬 유지 | `tests/test_hybrid_router.py:34,41,48,59` |
+| 실제 Laya 패키지 | sub-40 ms | 33 ms 는 **T4 GPU** 값. CPU 193–464 ms. MPS 는 fp32 강제·공개 수치 없음. `Router(preload=True)` 는 체크포인트 3개 전부 상주(≈4.7 GB fp32) | `engines/laya/README.md:27,137,167`, `laya/agent.py:225-226` |
+| C2 큐 확장 난이도 | schemaVersion 2 추가 | 계약이 fixture 프로젝트·`node === hostname`·`wait/write/fail`·`budgetUsd 0` 로 잠김. 어댑터는 codex 프로파일 2종. **Mac↔Windows 큐 전송 계층 없음**(SQLite 노드 로컬). 워커는 단일 비행·15 s 틱 | NV `job-contract.cjs:13-17`, `agent-adapter.cjs:4-7`, `execution-store.cjs`, `worker.cjs` |
+| Prompt Cache | 히트율 95.8% | 사실. 단 cache_creation 10.7M 은 **정상 대화 증분·TTL 만료**가 본체. "프리픽스 드리프트" 귀속은 v0.1 의 모델 오류 | transcript usage 집계 |
+| 일일 비용 상한 $2 | 가드레일 | 측정 코드 없음. 설정 숫자 | `config/agent_limits.json` |
+| 안티패턴 규칙 | 스킬 남발 차단 | `skills/**/SKILL.md` 쓰기 차단 → ai_guidelines §2 스킬 활용·하네스 스킬 작성과 충돌 | `anti_pattern_rules.json:15-16` |
 
-**결론:** 지시문의 "인터셉터 18 ms → 5 ms" 는 출발점 숫자가 실측이 아니므로, Phase 1 에서 기준선을 다시 세운 뒤 목표를 절대값으로 재확정한다. 현재 병목은 **모델 추론이 아니라 훅 프로세스 기동(Python 스폰 + import)** 이다. 이 사실이 Track 1 설계의 방향을 결정한다.
-
----
-
-## 2. North Star · 핵심 KPI
-
-### 2.1 North Star 정렬
-NV `NORTH_STAR.md` 의 4분류로 이 프로젝트의 산출물을 미리 분류한다. **배관·안전만 쌓이는 턴은 그렇게 보고한다.**
-
-| 산출물 | 분류 | 이유 |
-|---|---|---|
-| L0/L1 무토큰 판정 레이어, 추측 실행 히트 | **팔다리(effector)** | 에이전트 대기 없이 배가 움직인다 |
-| RouteLLM 임계치 튜닝, 프리픽스 지문 | 배관(plumbing) | 비용·지연을 줄이지만 조종간이 늘진 않는다 |
-| 구조화 출력 강제, 예측 실패 취소, Fallback | 안전(guardrail) | 되돌릴 수 없는 낭비를 막는다 |
-| 대시보드 HUD | 조종간(cockpit) 보조 | 유저가 어디서든 절감 상태를 본다 |
-
-### 2.2 KPI (모두 실측 정의 포함)
-
-| # | KPI | 기준선 (실측) | Phase 1 목표 | Phase 3 목표 | 측정 방법 |
-|---|---|---|---|---|---|
-| K1 | 훅 왕복 지연 p50 (PreToolUse/PostToolUse 진입→응답) | **57.7 ms** (폴백 경로) | ≤ 20 ms (데몬 상시 + 경량 클라이언트) | **≤ 5 ms** (L0 히트 시), ≤ 35 ms (L2 Laya) | `scripts/bench/hook_roundtrip.py` 100회 중앙값, 결과 `learning/metrics/hook_latency.jsonl` |
-| K2 | 무토큰 종결율 (L0+L1 에서 끝난 비율) | 미측정 | 측정 파이프라인 가동 | ≥ 60% (반복 에러·린트 패턴) | 라우터 텔레메트리 `layer_resolved` 필드 집계 |
-| K3 | 판정 품질 손실 (gold 대비 정확도 차) | 미측정 (gold 셋 없음) | gold 셋 ≥ 300건 확보 | **< 1.0%p** (Track 1-2 조건) | `engines/hybrid_router/eval/` holdout 정확도 |
-| K4 | 턴당 입력 토큰 중 캐시 미스 비율 (`input + cache_creation` / 총 입력) | **4.2%** (11세션 합산) | 세션별 cache_creation 원인 분류 | 세션 첫 턴 제외 **≤ 2%**, 프리픽스 드리프트 0건/주 | 세션 transcript usage 집계 스크립트 |
-| K5 | 추측 실행 히트율 / 체감 대기 | 없음 | — | 히트율 ≥ 40%, 히트 시 도구 대기 **0초**(결과 즉시 반환) | C2 결과 원장 `execution_results` + 라우터 `prefetch_hit` 로그 |
-| K6 | 추측 실행 낭비율 (취소·미사용 작업 비율) | 없음 | — | ≤ 30%, Windows 노드 CPU 유휴 시간에만 | 워커 `worker.stdout.log` + 큐 상태 |
-| K7 | 일일 비용 상한 준수 | $2.0/일 (`config/agent_limits.json`) | 변경 없음 | 변경 없음 | 기존 가드레일 |
-
-> "토큰 절감율" 은 단독 KPI 로 두지 않는다. 절감치는 반사실(LLM 이 안 돌았다면 썼을 토큰)이라 직접 측정이 불가능하므로, **K2(무토큰 종결율) × 에러 루프 1회당 실측 평균 토큰**(Claude Code transcript 에서 에러→수정까지의 output_tokens 를 사후 집계)으로 파생 지표만 보고한다. HUD 의 상수 기반 절감치는 "추정" 라벨을 붙인다.
+**카운슬 이견 기록:** 09-24 UTR(eb20336, Antigravity @ i7) 은 "ZTC 100% 준수: 로짓 기반 확신도 게이팅·forward-pass 분류 확인" 으로 기록했다. 본 계획과 두 검토는 위 표대로 이를 **부정**한다. 판정은 유저에게 올린다(§10-7).
 
 ---
 
-## 3. 범위 · 저장소 경계 (NV 좌표 규약 적용)
+## 2. North Star · KPI (v0.2 재정의)
 
-| 트랙 | 정본 저장소 | 이유 |
-|---|---|---|
-| Track 1 (라우터·인터셉터·평가 파이프라인) | **Pi** (`~/Pi`, `engines/hybrid_router/`, `scripts/`) | Pi 자체 개발 |
-| Track 2-1 C2 큐 스펙 확장·프로파일·Windows 워커 | **NV** (`~/projects/nv-claude-config`, `scripts/fleet/`, `docs/harness/`) | 하네스 정본. CLAUDE.md ⚓ 규약: Pi 에서 하네스 산출물 작업 금지, 3중 검증 후 착수 |
-| Track 2-1 예측기(라우터 측 next-action 예측) | Pi | 라우터 기능 |
-| Track 2-2 이기종 역할표 | NV `docs/harness/FLEET.md` 갱신 + Pi `config/routing_policy.json` `nodes` 반영 | 로스터는 NV, 정책 미러는 Pi |
-| Track 3 프리픽스 지문 | Pi (`scripts/prefix-fingerprint.py`), 규약 반영은 NV `AGENT_BASE_MD_SYNC` 트랙 | 지침 파일 동기화 트랙과 연동 |
+### 2.1 North Star 4분류
+| 산출물 | 분류 |
+|---|---|
+| 훅 배선 + L0 무토큰 판정, 로컬 프리페치 히트 | **팔다리** |
+| 정직화 리팩터, 벤치 규약, gold 셋 | 배관 |
+| 데몬 로컬 바인드, shadow 모드, 마스킹, 취소·TTL | 안전 |
+| HUD·대시보드 | 조종간 보조 (문구 정직화 후) |
 
-이 계획서 자체는 Pi 문서다. NV 측 산출물이 생기는 Phase 2 부터는 NV 에 `docs/harness/PLAN_C2_prefetch_ext_<date>.md` 를 별도로 두고 이 문서는 링크만 유지한다.
+배관·안전만 쌓인 턴은 그렇게 보고한다.
 
----
-
-## 4. 목표 아키텍처 — 4단 판정 사다리 (Decision Ladder)
-
-```
-tool call ──► hook client (bash/curl, no Python spawn) ──► router daemon (상시, unix socket + :9876)
-                                                             │
-     L0  signature hash lookup  (정규화된 에러 시그니처 → 판정)      ~0.05 ms   ZTC
-     L1  embedding kNN          (Semantic Router 패턴, ONNX 소형 인코더) ~2-5 ms  ZTC
-     L2  Laya typed decision    (실제 mmBERT 체크포인트, MPS)          ~30 ms   ZTC
-     L3  Jev API / LLM          (스키마 제약 출력, 서킷 브레이커)      200 ms+  토큰 발생
-                                                             │
-                                             confidence < τ_L ⇒ 다음 단으로 에스컬레이션
-```
-
-- **ZTC 정의(이 계획에서의 운용 정의):** 텍스트 생성 없이 로짓/유사도 분포만으로 확신도를 얻고 그 확신도가 임계치 이상이면 단락 결정한다. L0~L2 는 토큰을 생성하지 않는다.
-- **에스컬레이션 규칙:** 각 단은 `(decision, confidence, layer)` 를 반환. `confidence < τ_layer` 면 다음 단. τ 는 Track 1-2 의 튜닝 대상이며 초기값은 L0=exact match 만, L1=0.85 cosine, L2=Laya 보정 후 확률 0.80.
-- **폴백 순서(하향 안전):** L3 실패(서킷 OPEN) → L2 → 기존 휴리스틱(현 `LayaHierarchicalEngine`, 이름을 `HeuristicFallbackEngine` 으로 개명) → `allow`(개입 없음). **어떤 단이 죽어도 도구 호출 자체는 막히지 않는다.**
-- **훅 클라이언트:** Python 스폰이 K1 의 지배 항이므로 훅 진입점을 `scripts/hooks/router-client.sh`(bash + `curl --unix-socket`, 타임아웃 30 ms) 로 교체. 데몬이 없으면 즉시 `allow` 를 반환하고 `learning/metrics/hook_latency.jsonl` 에 `daemon_down` 을 남긴다.
-
----
-
-## 5. 트랙별 설계
-
-### Track 1 — ZTC 라우터 고도화 · 오픈소스 접목
-
-**1-1. Semantic Router 패턴 (L0 + L1)** — 단기
-- L0: 에러/린트 출력 정규화(경로·줄번호·해시·따옴표 내용 → 플레이스홀더) → SHA-256 앞 16자 시그니처 → `learning/router/signatures.sqlite` (판정·확신·최근 히트 시각·TTL). 히트 시 판정을 그대로 반환. 새 시그니처는 상위 단의 판정으로 채워진다(write-through).
-- L1: aurelio `semantic-router` 의 `Route`/`RouteLayer` 구조를 차용하되 의존성은 최소화. 인코더는 ONNX 소형 다국어 모델(`multilingual-e5-small` 급, CPU, int8) 1개를 데몬에 상주. 각 Tier-1 도메인·Tier-2 클래스에 발화 예시 20~50개를 `engines/hybrid_router/semantic/routes.json` 에 둔다. 코사인 ≥ τ_L1 면 종결.
-- 검증: `engines/hybrid_router/tests/test_ladder.py` — 동일 에러 2회 호출 시 두 번째는 L0, 서로 다른 경로의 같은 TS 에러는 L0 히트(정규화 검증), L1 임계치 미만은 L2 로 넘어감.
-
-**1-2. RouteLLM 파레토 임계치 자동 튜닝** — 중기
-- RouteLLM(lm-sys) 의 라우터 모델 자체(Chatbot Arena 선호 데이터 학습)는 이 도메인과 맞지 않으므로 **방법론만** 채택: "강한 모델 호출 비율 대비 품질" 곡선을 그리고, 품질 손실 허용치 안에서 호출 비율을 최소화하는 τ 를 고른다.
-- 데이터: 현 `learning/interventions.jsonl` 의 라우터 이벤트는 **15건**(syntax 12, dependency 2, general 1)으로 튜닝 불가. gold 셋은 Claude Code transcript(`~/.claude/projects/*/*.jsonl`)에서 `tool_result` 에러 → 다음 에이전트 행동을 추출해 반자동 라벨링(에이전트 1차 라벨 + 유저 샘플 검수 10%). 목표 ≥ 300건, 클래스별 ≥ 20건.
-- 산출: `engines/hybrid_router/eval/pareto.py` 가 (τ_L1, τ_L2) 격자에 대해 정확도·L3 호출율·p50 지연을 표로 내고, 품질 손실 < 1%p 조건의 최소 L3 호출율 조합을 `config/routing_policy.json` 의 `thresholds` 블록에 **제안**한다. 자동 적용은 하지 않는다(유저 승인 후 커밋).
-- 고정 규칙(`tokens <= 192`, `categories > 20`)은 유지하되, Laya 실제 컨텍스트 한도(mmBERT 1024 토큰)와 선택지 예산 20개를 상수가 아닌 정책 파일 값으로 옮긴다.
-
-**1-3. 구조화 출력 방어 (L3)**
-- 로컬 HF 모델 경로에서만 Outlines/Guidance 가 적용된다. 현 구성에는 로컬 생성형 모델이 없으므로 **Phase 2 에서는 API 측 스키마 강제**를 우선한다: Jev 는 타입드 결정(choice/score) 자체가 구조화 출력이고, Claude/기타 LLM 에스컬레이션은 tool-use/JSON 스키마 강제 + 1회 재시도 상한으로 재시도 토큰을 막는다.
-- 재시도 예산: 파싱 실패 시 1회만 재시도, 그래도 실패면 L2 판정으로 폴백하고 `schema_violation` 텔레메트리를 남긴다.
-- Outlines 는 Phase 3 에서 로컬 소형 생성 모델(예: Qwen 계열 1~3B, MPS)을 L2.5 로 도입할지 결정할 때 함께 평가한다. **이번 계획 범위에서는 선택 사항.**
-
-### Track 2 — 이기종 분산 연산 · 추측성 사전 실행
-
-**2-1. Speculative Prefetch Worker**
-- **예측기(Pi):** 라우터가 PostToolUse 에서 `(tool, exit_code, error_class, cwd, 최근 N 도구열)` 을 보고 다음 액션 후보를 낸다. 초기에는 규칙표(예: `tsc` 실패 → `npx tsc --noEmit` 재실행 + `eslint` ; `git commit` 직전 → `git diff --stat`; 테스트 실패 → 해당 테스트 파일만 재실행)로 시작하고, L1 인코더로 도구열 유사도 기반 예측을 Phase 3 에 추가.
-- **큐 확장(NV):** `job-contract.cjs` schemaVersion **2** 제안 — `operation: "prefetch"`, `commandClass ∈ {git_diff, tsc_noemit, eslint, ast_parse, test_subset, sqlite_mirror}`, `sourceCommit`·`treeDigest` 바인딩, `ttlMs`(기본 120 s), `cancelToken`. 결과는 기존 `execution_results` + `results/<job>.jsonl` 원장 재사용.
-- **승인 모델(핵심 결정, §9-1):** C2 는 작업마다 유저 서명이 필요하다. 추측 실행은 초당 단위로 작업이 생기므로 작업별 서명은 불가능하다. 제안: **"프리페치 템플릿 서명"** — 유저가 `commandClass` 허용 목록·대상 저장소·노드·유효기간(예: 7일)을 담은 템플릿 하나에 서명하고, 개별 프리페치 작업은 템플릿 digest + sourceCommit 에 바인딩된 파생 작업으로 큐에 들어간다. 워커는 템플릿 서명 검증 + 파생 작업이 템플릿 허용 범위 안인지 검증. 읽기 전용 프로파일 `prefetch-readonly-v1`(파일 변경 시 `WRITE_ATTEMPT_DETECTED`, 네트워크 금지, cwd 밖 읽기 금지) 만 허용.
-- **결과 반환:** 에이전트가 실제로 같은 명령을 호출하면 훅 클라이언트가 `(commandClass, sourceCommit, treeDigest)` 로 원장을 조회해 히트 시 결과를 `tool_result` 로 즉시 반환. treeDigest 불일치(작업 트리가 그 사이 바뀜) 면 미스 처리하고 정상 실행.
-- **Windows 측 워커:** i7 WSL2(`/srv/nv-worker`, node24) 를 1호 프리페치 워커로. `fleet worker loop` 를 WSL2 systemd `--user` unit 으로 등록(작업 스케줄러 Store 별칭 함정 회피, 메모리 `windows-task-scheduler-store-alias-pwsh`). NVG 는 2호, Site1 은 RAM 0.62 GB 여유로 **제외**.
-
-**2-2. 이기종 역할 분담표**
-
-| 노드 | 자원 | 역할 | 제외 사항 |
-|---|---|---|---|
-| richardkim-macpro-macbookpro (M5, 16 GB) | MPS | L1/L2 추론, Jev 게이트웨이, 라우터 데몬, 오케스트레이션, 시그니처 원장 정본 | 장시간 CPU 바운드 정적 검사(프리페치로 오프로드) |
-| richardkim-i7 (6C/12T, 16 GB, WSL2) | CPU | 프리페치 1호: tsc/eslint/AST/test_subset, SQLite 원장 미러 | 모델 추론, C: 10 GB 구속 → 산출물은 `/srv` 에만 |
-| nv-gigabyte (16 GB, Kepler) | CPU | 프리페치 2호(대기), 시그니처 원장 미러 | GPU 추론(Kepler 미지원) |
-| desktop-1q6j3e6 (8 GB, 0.62 GB 여유) | — | 관측·백업 전용 | 프리페치 전면 제외 |
-
-### Track 3 — 프리픽스 캐싱 · 상태 지문
-
-- 실측 히트율 95.8% 는 이미 API 캐시가 잘 작동함을 뜻한다. 남은 문제는 **cache_creation(10.7M tokens)** 즉 "새로 쓴 프리픽스" 이며 원인은 ① 세션 첫 턴(불가피) ② 지침 파일 변경으로 인한 전 노드 프리픽스 무효화 ③ 프리픽스 앞쪽에 섞이는 가변 내용(날짜·git 상태 등).
-- **프리픽스 지문:** `scripts/prefix-fingerprint.py` 가 `CLAUDE.md`, `ai_guidelines.md`, `docs/PROJECT_BRIEF.md`, `AGENTS.md`, 메모리 `MEMORY.md` 의 SHA-256 을 계산해 `learning/metrics/prefix_fingerprint.jsonl` 에 (노드, 시각, 지문) 을 남긴다. 지문이 하루 2회 이상 바뀌면 "프리픽스 드리프트" 경고를 세션 복구 브리핑에 표출.
-- **핸드오프 연동:** Handoff Bus 핸드오프 문서에 `prefix_fingerprint` 필드를 넣어, 수신 세션이 같은 지문이면 지침 재전송 없이 델타만 받는다(Antigravity ↔ Claude Code ↔ Codex).
-- **API 직접 호출 경로(Jev/LLM 에스컬레이션):** 고정 시스템 프롬프트에 `cache_control` 브레이크포인트를 명시하고 가변 내용은 그 뒤에 둔다.
-- 지침 파일 편집은 **하루 1회 묶음 반영**을 권고 규칙으로 제안(§9-4).
-
----
-
-## 6. 단계별 마일스톤 · WBS
-
-일정은 KST 기준, 각 Phase 는 유저 승인 게이트로 끝난다. 착수 조건이 충족되지 않으면 그 Phase 는 시작하지 않는다.
-
-### Phase 1 — 준비·검증 (2026-09-24 ~ 2026-09-30) · 저장소: Pi
-
-| WBS | 산출물 | 완료 판정 |
-|---|---|---|
-| 1.1 기준선 벤치 | `scripts/bench/hook_roundtrip.py`, `scripts/bench/router_bench.py`, 결과 `learning/metrics/baseline_20260924.json` | 훅 왕복 100회·엔진 1,000회 실측치가 파일로 존재, 시뮬레이션 상수 제거 전/후 비교표 |
-| 1.2 정직화 리팩터 | `hierarchical_engine.py` 의 `+18.5`/`34.2`/`38.5` 상수 제거, `HeuristicFallbackEngine` 개명, HUD 절감치에 `estimate` 라벨 | 기존 8/8 테스트 통과 + 지연 상수 관련 assert 를 실측 기반으로 교체 |
-| 1.3 데몬 상시화 | `scripts/hybrid-router-daemon.py` unix socket 추가, LaunchAgent 템플릿 `scripts/launchd/com.pi.hybrid-router.plist` | 템플릿 lint 통과. **등록은 시스템 상태 변경 → 유저 승인(§9-2)** |
-| 1.4 훅 클라이언트 | `scripts/hooks/router-client.sh` | 데몬 다운 시 30 ms 내 `allow`, 데몬 업 시 p50 ≤ 20 ms |
-| 1.5 L0 시그니처 원장 | `engines/hybrid_router/ladder/l0_signature.py`, `learning/router/signatures.sqlite` | 정규화 테스트 10케이스, 2회차 히트 p50 < 1 ms |
-| 1.6 실제 Laya 기동 검증 | `python3.11 -m venv .venv-laya`, `pip install laya`, MPS 에서 mmBERT 1회 추론 | 실측 지연(목표 ≤ 40 ms p50 on MPS) 과 상주 메모리를 baseline 파일에 기록. 설치는 `npm install` 과 같은 급의 환경 변경 → 승인(§9-3) |
-| 1.7 gold 셋 1차 | `engines/hybrid_router/eval/gold/v1.jsonl` ≥ 100건 | 라벨 스키마 고정, 유저 검수 샘플 10건 |
-
-**Exit:** K1 기준선 확정, 시뮬레이션 상수 0, L0 동작, 실제 Laya 실측 1건. UTR 에 "배관 위주 Phase" 로 정직 보고.
-
-### Phase 2 — 통합·라우팅 고도화 (2026-10-01 ~ 2026-10-14) · 저장소: Pi + NV
-
-| WBS | 산출물 | 완료 판정 |
-|---|---|---|
-| 2.1 L1 임베딩 단 | `ladder/l1_semantic.py`, `semantic/routes.json`, ONNX 인코더 상주 | p50 ≤ 5 ms(인코더 워밍 후), routes 커버리지 Tier-2 전 클래스 |
-| 2.2 L2 실제 Laya 편입 | `ladder/l2_laya.py` (라우터 `Router(preload=True)`), 휴리스틱은 폴백으로 강등 | gold 셋 정확도 ≥ 휴리스틱 + 10%p, p50 ≤ 40 ms |
-| 2.3 파레토 평가 파이프라인 | `eval/pareto.py`, `eval/report_<date>.md` 금지 → 결과는 `learning/metrics/pareto_<date>.json` + UTR 표 | gold ≥ 300건, τ 제안 1세트 |
-| 2.4 L3 스키마 강제 | `gateway/jev_client.py` 실 HTTP 경로 + JSON 스키마 검증 + 재시도 1회 상한 | 스키마 위반 주입 테스트에서 재시도 ≤ 1, 폴백 L2 |
-| 2.5 C2 큐 스펙 v2 (NV) | NV `docs/harness/PLAN_C2_prefetch_ext_<date>.md`, `job-contract.cjs` v2, `prefetch-readonly-v1` 프로파일, 템플릿 서명 검증 | NV 테스트 90/90 + 신규 ≥ 8, 원격 존재 확인(`git ls-tree origin/sync/...`) |
-| 2.6 예측기 규칙표 | `engines/hybrid_router/prefetch/predictor.py` + `config/prefetch_rules.json` | 규칙 10개, 단위 테스트 |
-| 2.7 프리픽스 지문 | `scripts/prefix-fingerprint.py`, 세션 복구 브리핑에 드리프트 경고 | 4노드 지문 일치 확인 1회 |
-
-**Exit:** 4단 사다리 로컬 완결, τ 제안서 유저 검토, C2 v2 스펙 유저 승인.
-
-### Phase 3 — 분산 추측 실행 검증 (2026-10-15 ~ 2026-10-31) · 저장소: NV 주도
-
-| WBS | 산출물 | 완료 판정 |
-|---|---|---|
-| 3.1 프리페치 템플릿 서명 1호 | 유저 TTY 서명(에이전트는 키·암호구절 미접근) | `fleet approve show` 로 템플릿 확인 |
-| 3.2 i7 WSL2 워커 등록 | systemd `--user` unit, `fleet worker loop` | 틱 로그 `found=0` 확인, 리스 pid 일치 |
-| 3.3 Mac ↔ i7 실시간 연동 | Mac 라우터 → 큐 enqueue → i7 실행 → 원장 → Mac 훅 히트 | 왕복 실측: enqueue→결과 도착 시간, 히트 시 tool_result 즉시 반환 데모 3케이스 |
-| 3.4 취소·TTL | `cancelToken` 전파, TTL 만료 정리, treeDigest 미스 처리 | 예측 실패 시나리오 5개 통과, 낭비율 K6 측정 |
-| 3.5 단절 폴백 | Tailnet 단절 주입(워커 정지·방화벽) 시 Mac 측 무영향 | 훅 p50 변화 없음, 큐에 stale→unknown 만 남음 |
-| 3.6 NVG 2호 확장(선택) | 동일 절차 | 유저 결정 |
-
-**Exit:** K5·K6 실측, ORCH 루프 통합 보고, 스킬 등록은 보류(DECISION_orchestrator_loop §3).
-
----
-
-## 7. 리스크 분석 · 롤백
-
-| # | 리스크 | 영향 | 완화 | 롤백 |
+### 2.2 KPI
+| # | KPI | 기준선 | 목표 | 측정 정의 |
 |---|---|---|---|---|
-| R1 | Tailnet 지터·Windows 노드 단절 | 프리페치 결과 미도착 | 훅은 원장 조회만 하고 결과 대기를 **절대 하지 않는다**(미스 = 정상 실행). 워커 heartbeat 60 s 초과 시 stale→unknown(기존 C2 규칙) | 프리페치 비활성 플래그 `config/prefetch_rules.json` `enabled:false` 1줄 |
-| R2 | 예측 실패로 인한 Windows 노드 부하 | CPU·디스크 낭비, i7 C: 10 GB 압박 | 동시 프리페치 ≤ 2, TTL 120 s, `cancelToken` 으로 후속 도구열이 예측과 어긋나면 즉시 취소, 산출물은 `/srv` 한정·크기 상한 1 MB | 워커 unit 정지(`systemctl --user stop`) |
-| R3 | 추측 실행이 부작용 있는 명령을 실행 | 비가역 변경 | `prefetch-readonly-v1` 만 허용, `commandClass` 화이트리스트, 파일 변경 감지 시 실패 처리(기존 codex-readonly-v1 방식 재사용) | 템플릿 서명 폐기(유저) |
-| R4 | 훅 지연이 오히려 증가 | 모든 도구 호출이 느려짐 | 훅 클라이언트 하드 타임아웃 30 ms → `allow`; K1 회귀 테스트를 CI 에 | 훅 등록 해제(settings hooks 1항목) |
-| R5 | 실제 Laya 가 M5 에서 목표 지연 미달 | L2 무의미 | Phase 1.6 에서 먼저 실측 후 결정; 미달 시 L2 를 배치 모드/비동기 사전 판정으로 전환 | L2 비활성, L1→L3 직결 |
-| R6 | gold 셋 라벨 편향(에이전트 자기 라벨) | τ 튜닝이 품질 손실을 못 잡음 | 유저 검수 10% + 클래스별 최소 20건, holdout 분리 | τ 를 초기값으로 되돌림 |
-| R7 | 상수 제거로 대시보드 숫자가 "나빠 보임" | 보고 혼선 | 기준선 문서에 "이전 값은 시뮬레이션" 명기, HUD 에 estimate 라벨 | 없음(정직화는 되돌리지 않음) |
-| R8 | 지침 파일 잦은 편집으로 캐시 무효화 | 비용 증가 | 지문 드리프트 경고, 일 1회 묶음 반영 | 없음 |
-| R9 | NV 좌표 위반(Pi 에서 하네스 산출물 작성) | 정본 분열 | Phase 2.5/3 착수 전 3중 검증 절차를 체크리스트로 | 잘못 놓인 파일은 NV 로 이전 후 Pi 에서 삭제 |
+| K1 | 훅 왕복 지연 **p50 / p99 / 타임아웃률 / allow-폴백률** | 미측정(훅 미배선) → Phase 1.1 배선 후 첫 측정이 기준선 | L0 히트 p50 ≤ 5 ms, p99 ≤ 30 ms, 타임아웃률 < 1% | 훅 클라이언트가 `learning/metrics/hook_latency.jsonl` 에 매 호출 기록. cold/warm 구분, Python 기동 포함 여부 명시 |
+| K2 | 무토큰 종결율 = L0 종결 건수 / **실패한 도구 호출(exit≠0) 건수** | 미측정 | ≥ 50% (반복 에러·린트) | 분모 고정. write-through 로 자동 상승하는 효과를 막기 위해 "최초 관측 시그니처" 와 "재관측" 을 분리 집계 |
+| K3 | 판정 정확도 (gold 대비) **+ 95% CI** | 휴리스틱 실측 정확도(Phase 1.6) | L0 v1 이 휴리스틱 대비 **비열등**(마진 3%p, n≥300). 1%p 판별은 n≥1,000 확보 후에만 주장 | holdout 30%, 유저 검수 10%, 클래스별 ≥ 20건 |
+| K4 | **오처방률** = 주입된 처방 후 같은 에러가 2회 이상 재발한 비율 | 미측정 | ≤ 10% | shadow 모드에서 판정과 실제 에이전트 다음 행동을 대조 |
+| K5 | 프리페치 히트율 / 히트 시 도구 실행 시간 | 없음 | 히트율 ≥ 30%(로컬 워커), 히트 시 실행 시간 = 캐시 읽기 시간 | PreToolUse `updatedInput` 으로 명령을 캐시 결과 읽기로 치환한 건수 / 대상 명령 호출 건수. treeDigest 일치 시만 |
+| K6 | 프리페치 낭비율 | 없음 | ≤ 30% | 취소·미사용 작업 / 발행 작업 |
+| K7 | **세션당 순 output_tokens · 비용(전후 비교)** | 최근 11세션 output 3.06M tokens | 동종 작업 기준 −15% | transcript usage 집계 스크립트. 유일하게 돈이 걸린 지표. HUD 의 상수 절감치는 폐기 |
+
+삭제: v0.1 K4(캐시 미스 ≤ 2%, 모델 오류), K7($2/일, 미터 없음).
+
+---
+
+## 3. 범위 · 저장소 경계
+
+| 트랙 | 정본 저장소 |
+|---|---|
+| Track 1 전부, Track 2 **로컬 워커**, Track 3 | Pi |
+| Track 2 **Windows 확장**(C2 계약 v2·어댑터·프로파일·전송 계층·템플릿 서명) | NV — Phase 3 이후, 별도 계획서 + 별도 보안 검토 + 3중 좌표 검증 |
+
+Pi 훅이 NV 런타임(`~/.nv-fleet-execution`) 을 읽는 결합은 **Phase 1~2 에서 만들지 않는다.** 로컬 워커는 Pi 자체 원장(`~/.pi-router/`)을 쓴다.
+
+---
+
+## 4. 목표 아키텍처 (v0.2)
+
+```
+tool call ─► hook client (에이전트별 stdin/stdout 프로토콜, 파일 존재 가드) ─► router daemon (127.0.0.1 / unix socket 0600)
+                │  동기 예산 30 ms                       │
+                │  L0  정규식 + 정규화 시그니처 원장     ─┘  히트 → 판정/처방 (ZTC)
+                │  미스 → allow (개입 없음) + 비동기 판정 요청 enqueue
+                ▼
+   background judge (데몬 워커 스레드)            ─►  L3 LLM/Jev (스키마 강제, 재시도 1회)  ─► 원장 write-through
+                                                      (L1 임베딩·L2 Laya 는 §10-5 게이트 통과 시에만 삽입)
+```
+
+- **동기/비동기 분리(핵심 수정):** 훅 안에서 응답하는 것은 L0 뿐이다. L2(≥33 ms GPU 최선)·L3(200 ms+) 는 훅 예산과 양립하지 않으므로 백그라운드에서 판정해 원장에 적재하고, 같은 시그니처의 **다음** 발생부터 L0 히트가 된다.
+- **shadow 모드 우선:** Phase 1 의 훅은 판정을 기록만 하고 에이전트에 아무것도 주입하지 않는다. K4 오처방률이 측정된 뒤 `additionalContext` 주입 → 그 다음에야 `deny`/`updatedInput` 개입을 클래스별 opt-in.
+- **폴백:** 데몬 부재·타임아웃·오류 → `allow`. 어떤 단이 죽어도 도구 호출은 막히지 않는다.
+- **L1/L2 삽입 게이트(§10-5):** gold 셋에서 L0 가 못 푸는 비율이 20% 를 넘고, 그 케이스가 K7 에 유의미한 토큰을 쓰고 있을 때만 L1(ONNX 소형 인코더) → L2(Laya) 순으로 검토. Laya 는 로컬 MPS 조건에서 반복 100회 p50·상주 메모리를 재는 계획서와 함께 별도 승인.
+
+---
+
+## 5. 트랙별 설계 (v0.2)
+
+### Track 1 — 라우터·인터셉터 정직화와 L0
+1. **훅 배선(Phase 1.1):** Claude Code 는 stdin JSON → stdout JSON(PreToolUse: `permissionDecision`/`updatedInput`; PostToolUse: `additionalContext`/`decision`), Codex 는 `.codex/hooks.json` 동일 계약, Antigravity 는 해당 IDE 훅 규격 확인 후. 공유 `.claude/settings.json` 에는 `[ -x scripts/hooks/router-client.sh ] &&` 가드로 Windows 노드에서 무해화(공유 settings 훅은 파일 존재 가드 필수).
+2. **데몬 안전화(Phase 1.2):** `127.0.0.1` 또는 unix socket 0600 만 바인드, `/telemetry` 에서 명령 문자열 제거, `/health` 가 원장·워커 스레드 상태를 실제로 검사, 요청 크기 상한 64 KB, ThreadingHTTPServer, 요청 ID.
+3. **정직화(Phase 1.3):** 상수 `+18.5/34.2/38.5/18.0/18.2/12.0` 제거, 대시보드 문구 3곳 제거, 루트 `routing_policy.json` 삭제 후 `evaluate_route` 가 `config/routing_policy.json` 을 실제로 읽게, 엔진 클래스 `HeuristicFallbackEngine` 개명, `skills/**` 차단 규칙 제거, 시뮬 단언 테스트를 실측 기반으로 교체, 라우터 이벤트를 `learning/interventions.jsonl` 에서 `learning/metrics/router_events.jsonl` 로 분리(유저 개입 통계 오염 방지).
+4. **L0 v0(Phase 1.4):** 이미 존재하는 `error_signatures.patterns` 정규식을 코드가 실제로 사용하게 한다(현재 `:178` 은 미사용). L0 v1 은 정규화(경로·줄번호·해시 치환) 시그니처 원장 `~/.pi-router/signatures.sqlite`. 새 의존성 0.
+5. **벤치 규약(Phase 1.5):** cold/warm × 동시성 1/3 × p50/p95/p99, 원자료 `learning/metrics/bench_<date>.jsonl` 보존, 1회 측정으로 p50 을 주장하지 않음.
+6. **gold 셋(Phase 1.6):** 스키마에 **마스킹 규칙**(절대경로→상대, 64-hex·토큰 패턴 삭제, 본문 500자 절단) 을 먼저 고정. 원자료는 저장소 밖 `~/.pi-router/gold/`(4노드 push 대상에서 제외), 저장소에는 집계 통계만. 1차 100건(Phase 1), 300건(Phase 2). K3 정의와 일치시킴.
+7. **파레토 튜닝(Phase 2):** RouteLLM 방법론만 차용(자체 gold 로 L0 임계·L3 호출율 곡선). 자동 적용 없음, 제안 → 유저 승인 → 커밋.
+8. **L3 구조화 출력(Phase 2):** Jev 실 HTTP 경로 + mock 서버 테스트 + JSON 스키마 검증 + 재시도 1회 상한. Outlines/Guidance 는 로컬 생성 모델 도입 시(§10-5 이후) 평가.
+
+### Track 2 — 추측 실행: 로컬 워커 기본, Windows 는 조건부
+1. **로컬 프리페치 워커(Phase 2, Pi):** 데몬 내 워커 스레드가 예측 규칙표(`config/prefetch_rules.json`, 10개)로 다음 명령을 **같은 cwd·더티 트리에서** 실행. treeDigest 는 `git write-tree`(임시 인덱스) 오브젝트 ID 기반(파일 바이트 해시 아님 → CRLF 무관). 결과는 `~/.pi-router/prefetch/<digest>.out`, TTL 120 s, 동시 1, 출력 상한 1 MB, `cancelToken` 으로 후속 도구열이 어긋나면 취소.
+2. **히트 반환 메커니즘(Phase 2):** PostToolUse 는 tool_result 를 대체할 수 없으므로, PreToolUse `updatedInput` 으로 명령을 `cat <cached>.out; exit <cached_code>` 로 치환한다. treeDigest·argv·cwd 세 가지가 모두 일치할 때만. 이것이 "체감 0초" 의 실제 구현이며 K5 의 분자다.
+3. **명령 클래스 v1:** `git_diff_stat`, `tsc_noemit` 두 개만. `eslint`·`test_subset` 은 저장소 코드 실행이므로 로컬 워커에서도 K4·K6 실측 후 추가.
+4. **Windows 확장(Phase 3 이후, NV, 조건부):** 로컬 히트율 ≥ 30% 가 실측되고, 두 검토가 명시한 최소 안전 범위(고정 argv, 워커 소유 도구 바이너리, `sourceCommit` 은 서명 base 의 후손이며 origin 보호 ref 존재, 네트워크 차단 `unshare -n`, 시간당·동시·출력 상한, 취소 목록, 템플릿 digest 필드 목록) 를 담은 **별도 보안 검토서**가 통과한 뒤에만. Mac↔Windows 큐 전송 계층은 신규 설계 항목이며 공수는 v0.1 추정의 3배 이상으로 재산정.
+5. **이기종 역할표:** M5 = 데몬·L0·로컬 워커·L3 게이트웨이. i7 = Windows 확장 1호 후보(WSL2). NVG = 2호 후보. Site1 = 제외.
+
+### Track 3 — 캐시·프리픽스 (축소)
+- v0.1 의 "프리픽스 드리프트가 cache_creation 의 원인" 은 철회한다. cache_creation 은 대화 증분·TTL 만료가 본체다.
+- 남기는 것: ① 직접 API 호출 경로(L3)에서 고정 시스템 프롬프트에 `cache_control` 브레이크포인트, ② 지침 파일 변경 빈도 모니터(`scripts/prefix-fingerprint.py`, 비용 아닌 **거버넌스** 지표로 격하), ③ K7 세션당 토큰·비용 집계 스크립트.
+- 삭제: Handoff Bus "델타만 전송"(프로바이더 간 캐시 무관), 일 1회 묶음 반영 규칙 제안(근거 상실).
+
+---
+
+## 6. 단계별 마일스톤 · WBS (v0.2)
+
+### Phase 1 — 배선·정직화·L0 (2026-09-25 ~ 2026-10-08) · Pi
+| WBS | 산출물 | 완료 판정 |
+|---|---|---|
+| 1.1 훅 배선(shadow) | `scripts/hooks/router-client.sh` + Claude Code/Codex 훅 계약 구현, 파일 존재 가드 | Mac 에서 Bash 호출 100회 중 훅 기록 100건, Windows 노드 settings 무해 확인, 에이전트 주입 0 |
+| 1.2 데몬 안전화 | 로컬 바인드, telemetry 정화, readiness, 크기 상한, 스레딩 | `lsof` 로 0.0.0.0 미노출 확인, 동시 3 요청 직렬화 없음 |
+| 1.3 정직화 | 상수·문구·죽은 설정·차단 규칙 제거, 테스트 교체, 이벤트 로그 분리 | `grep` 으로 상수 0건, 테스트 통과(실측 단언), `config/` 정책이 실제 소비됨을 테스트로 고정 |
+| 1.4 L0 v0→v1 | 기존 정규식 사용 → 시그니처 원장 | 재관측 히트 p50 < 1 ms, 정규화 테스트 10케이스 |
+| 1.5 벤치 규약·첫 기준선 | `scripts/bench/`, `learning/metrics/bench_<date>.jsonl` | K1 4지표 첫 값 |
+| 1.6 gold 100건 + 휴리스틱 실측 정확도 | `~/.pi-router/gold/v1.jsonl`(로컬), 집계는 `learning/metrics/gold_stats.json` | 마스킹 규칙 통과, 유저 검수 10건, K3 기준선 |
+| 1.7 데몬 LaunchAgent | 템플릿만 작성 | 등록은 1.2 완료 후 별도 승인(§10-2) |
+
+**삭제:** v0.1 1.6(실 Laya 설치). **Exit:** K1·K3·K4 기준선 존재, 시뮬 상수 0, 훅 shadow 가동, 에이전트 개입 0. "배관·안전 위주 Phase" 로 보고.
+
+### Phase 2 — 로컬 프리페치·L3·튜닝 (2026-10-09 ~ 2026-10-29) · Pi
+| WBS | 산출물 | 완료 판정 |
+|---|---|---|
+| 2.1 개입 opt-in | shadow → `additionalContext` → 클래스별 `deny`/`updatedInput` | K4 오처방률 ≤ 10% 인 클래스만 opt-in |
+| 2.2 로컬 프리페치 워커 | 규칙표 10개, write-tree digest, TTL·취소, `updatedInput` 히트 반환 | K5·K6 첫 실측, 취소 시나리오 5개 |
+| 2.3 L3 실 HTTP + 스키마 | mock 서버 테스트, 재시도 1회 | 스키마 위반 주입 시 재시도 ≤ 1, 폴백 allow |
+| 2.4 gold 300건 + 파레토 제안 | `learning/metrics/pareto_<date>.json` | τ 제안 1세트, CI 명시 |
+| 2.5 K7 집계 | 세션당 토큰·비용 스크립트 | 전후 비교 첫 표 |
+| 2.6 L1/L2 게이트 판정 | §10-5 근거 자료 | 유저 결정 |
+
+### Phase 3 — 조건부 확장 (2026-10-30 ~) · NV 주도, 조건부
+| WBS | 조건 |
+|---|---|
+| 3.1 Windows 프리페치 보안 검토서 | 2.2 히트율 ≥ 30% |
+| 3.2 C2 계약 v2·어댑터·전송 계층·템플릿 서명 설계 | 3.1 통과 + 유저 승인 |
+| 3.3 i7 WSL2 워커·연동 테스트 | 3.2 |
+| 3.4 L1/L2 도입 | §10-5 |
+
+---
+
+## 7. 리스크 · 롤백 (v0.2)
+| # | 리스크 | 완화 | 롤백 |
+|---|---|---|---|
+| R1 | 훅이 도구 호출을 느리게 함 | 하드 타임아웃 30 ms → allow, K1 p99·타임아웃률 회귀 테스트 | settings 훅 1항목 제거 |
+| R2 | 오처방 주입으로 에이전트가 더 돎 | shadow → additionalContext → 개입 순서, K4 게이트 | 클래스별 opt-in 해제 |
+| R3 | 데몬이 같은 UID 프로세스에 열려 있음 | 소켓 0600, 요청 크기·속도 상한, 원장 항목에 생산 레이어·시각 기록 | 데몬 정지 |
+| R4 | 프리페치가 부작용 있는 명령 실행 | 클래스 2개 고정 argv, 읽기 전용, 출력 상한 | `prefetch_rules.json enabled:false` |
+| R5 | treeDigest 미스로 히트율 저조 | write-tree 기반, 더티 트리 지원(로컬이라 가능) | Track 2 축소 |
+| R6 | gold 셋 민감정보 유출 | 마스킹 스키마 선행, 원자료 저장소 밖 | 파일 삭제·재생성 |
+| R7 | 정직화로 대시보드 수치 급락 | 기준선 문서에 "이전 값 시뮬" 명기 | 되돌리지 않음 |
+| R8 | 공급망(향후 L1/L2) | 해시 핀·오프라인 미러 없이는 설치 승인 요청 안 함 | — |
+| R9 | 다중 에이전트 동시 훅 | ThreadingHTTPServer, 원장 SQLite WAL | — |
+| R10 | NV 좌표 위반 | Phase 3 전까지 NV 산출물 0 | — |
+| R11 | Windows 확장 시 템플릿 서명이 권한 확대가 됨 | 별도 보안 검토서 + 최소 범위 + 취소 목록 | 템플릿 폐기(유저) |
 
 ---
 
 ## 8. 가드레일 준수 계획
-
-- **4중 게이트(ai_guidelines §1~§4):** Slop 금지 → 시뮬레이션 상수를 실측으로 교체하는 것이 첫 작업. 테스트·린트 → 모든 신규 모듈에 unittest, biome pre-commit 유지. 비용 → 일 $2.0 상한 유지, L3 호출은 파레토 평가 결과로만 확대. 회의 프로토콜 → Phase 종료마다 UTR 갱신, 비오케스트레이터 턴은 council entry.
-- **NV 좌표 규약:** Track 2 큐·워커·프로파일은 NV 에서만. 매 NV 작업 시작 시 `Set-Location`/`git rev-parse --show-toplevel`/`git remote get-url origin` 3중 검증을 결과에 명기. 완료 판정은 원격 존재 확인.
-- **비파괴 검증:** 벤치·평가는 스크래치패드 또는 `learning/metrics/` 에만 기록. `learning/interventions.jsonl` 에는 라우터 이벤트를 더 이상 섞지 않고 `learning/metrics/router_events.jsonl` 로 분리(§7 유저 개입 로그의 통계 오염 방지 — 현재 559행 중 15행이 라우터 이벤트).
-- **유저 승인 게이트:** 시스템 상태 변경(LaunchAgent 등록, venv·pip 설치, WSL2 unit 등록, 훅 등록), C2 계약 변경, τ 정책 반영, 템플릿 서명은 모두 AskUserQuestion 승인 후 에이전트가 직접 수행(스킬 `approval-gate-exec`). 서명 키·암호구절은 유저만.
-- **가시적 정지점:** 각 Phase 끝에서 멈춘다. 다단계 자율 루프로 Phase 를 연속 실행하지 않는다(메모리 `no-blackbox-agent-loops`).
-- **자유 보고서 파일 금지:** 평가 결과는 `learning/metrics/*.json` 과 UTR 표로만. `*-report.md` 생성 없음.
-
----
-
-## 9. 유저 결정 요청 (Requires User Approval)
-
-1. **프리페치 승인 모델** — "템플릿 1회 서명 + 파생 작업 자동 큐잉" 을 C2 의 예외로 허용할지. 허용하지 않으면 Track 2-1 은 Mac 로컬 백그라운드 워커(서명 불필요, 같은 노드) 로 축소된다.
-2. **라우터 데몬 LaunchAgent 등록**(`com.pi.hybrid-router`) — Phase 1.3.
-3. **Python 3.11 venv + `pip install laya`(torch 2.14 포함, 약 3~4 GB)** — Phase 1.6.
-4. **지침 파일 일 1회 묶음 반영 규칙**을 ai_guidelines 에 추가할지 — Track 3.
-5. **Site1 프리페치 제외·i7 1호 지정** 확인.
-6. 이 계획서의 Phase 1 착수 승인.
+- 4중 게이트: Slop 금지 → 정직화가 첫 작업. 테스트·린트 → 실측 단언 테스트, biome. 비용 → 신규 유료 호출 0(Phase 1), L3 는 Phase 2 mock 우선. 회의 → Phase 종료마다 UTR/council entry.
+- NV 좌표: Phase 1~2 는 Pi 만. Phase 3 착수 시 3중 검증 명기.
+- 비파괴: 벤치·평가는 `learning/metrics/`·`~/.pi-router/` 에만. 개입 로그 오염 방지.
+- 승인 게이트: 훅 등록·데몬 등록·설정 변경·τ 반영·Windows 확장은 AskUserQuestion 후 에이전트 직접 수행. 키·암호구절은 유저만.
+- 가시적 정지점: Phase 단위. 자율 루프 금지.
+- 자유 보고서 금지: 검토 원문은 `docs/evidence/` 에, 결과는 metrics JSON + UTR 표.
 
 ---
 
-## 10. 참조
+## 9. 검토 반영 기록 (v0.1 → v0.2)
 
-- 상위 결정: NV `docs/harness/DECISION_orchestrator_loop.md`, `NORTH_STAR.md`, `DECISION_i7_reinstatement_20260922.md`
-- C2 원장·서명: NV `docs/harness/PLAN_C2_worker_loop_20260922.md`, `scripts/fleet/{job-contract,job-queue,worker,approval-keys}.cjs`
+| 출처 | 지적 | 판정 | 반영 |
+|---|---|---|---|
+| Claude P1 | 훅 미배선, 57.7 ms 는 기준선 아님 | 수용 | §1, K1 재정의, Phase 1.1 |
+| Claude P2 | tool_result 대체 불가 | 수용 | `updatedInput` 치환 메커니즘으로 대체(§5 T2-2) |
+| Claude P3, Codex 1 | 누락 상수·문구 | 수용 | Phase 1.3 목록 확장 |
+| Claude P4, Codex 1 | 정책 파일 미사용·중복 | 수용 | Phase 1.3 |
+| Claude P5, Codex 1 | Jev HTTP 없음 | 수용 | §1, Phase 2.3 mock 우선 |
+| Claude P6 | Laya 수치 T4, preload 4.7 GB | 수용 | 1.6 삭제, §10-5 게이트 |
+| Claude P7/P8, Codex 5 | C2 확장 공수 과소·전송 계층 없음·서명 모델 위험 | 수용 | Track 2 로컬 기본, Windows Phase 3 조건부 + 보안 검토서 |
+| Claude P9 | 테스트가 시뮬 고정 | 수용 | Phase 1.3 |
+| Claude P10 | $2/일 미터 없음 | 수용 | K7 교체 |
+| Claude §2 캐시 모델 | cache_creation 은 대화 증분 | 수용 | Track 3 축소, v0.1 K4 삭제 |
+| Claude §3 4단 과설계 | L0+L3 로 충분 | **부분 수용** | L1/L2 를 삭제하지 않고 §10-5 게이트 뒤로 |
+| Claude §3 순서 | 배선 → 정직화 → L0 → 로컬 워커 | 수용 | Phase 1 WBS 재배열 |
+| Codex 2 gold 유출·마스킹 | | 수용 | Phase 1.6 |
+| Codex 3 shadow 우선·무인증 데몬 등록 금지·Laya 설치 보류 | | 수용 | §4, Phase 1.2/1.7, 1.6 삭제 |
+| Codex 3 gold 100/300 불일치 | | 수용 | K3·1.6·2.4 일치 |
+| Codex 2 미션 우선순위(RVH 대비 기회비용) | | **유저 판단** | §10-8 |
+| Codex 2 Handoff Bus 연동은 기존 기능 아님 | | 수용 | Track 3 에서 삭제 |
+| Claude 훅 30 ms vs L2/L3 양립 불가 | | 수용 | §4 동기/비동기 분리 |
+| Claude `skills/**` 차단 자기모순 | | 수용 | Phase 1.3 |
+| Claude K2 허영 지표 | | 수용 | 분모 고정·최초/재관측 분리 |
+| Claude K3 통계 | | 수용 | 비열등 마진 3%p, CI 명시 |
+
+---
+
+## 10. 유저 결정 요청 (v0.2)
+1. **Track 2 기본을 로컬 워커로 변경** 승인 (Windows 확장은 Phase 3 조건부). v0.1 §9-1 템플릿 서명 모델은 Phase 1 승인 항목에서 **제외**.
+2. 데몬 LaunchAgent 등록 — Phase 1.2 안전화 완료 후 별도 승인.
+3. 훅 등록(shadow 모드) — 공유 `.claude/settings.json` 변경이므로 승인 필요.
+4. ~~Laya 설치~~ — 철회. §10-5 게이트 통과 시 재요청.
+5. L1/L2 삽입 게이트 기준(gold 에서 L0 미해결 ≥ 20% 이고 K7 유의미) 승인.
+6. Site1 제외·i7 후보 확인.
+7. **카운슬 이견 판정:** 09-24 UTR 의 "ZTC 100% 준수" 기록 vs 본 계획 §1 진실표.
+8. **우선순위:** 현 제품 초점(Remote Vibe Hub) 대비 이 프로젝트의 착수 시점.
+9. Phase 1 착수 승인.
+
+---
+
+## 11. 참조
+- 검토 원문: `docs/evidence/ztc-plan-review-20260924/`
+- 상위 결정: NV `DECISION_orchestrator_loop.md`, `NORTH_STAR.md`, `DECISION_i7_reinstatement_20260922.md`
+- C2: NV `PLAN_C2_worker_loop_20260922.md`, `scripts/fleet/{job-contract,job-queue,worker,approval-keys,agent-adapter}.cjs`
 - 현 구현: `engines/hybrid_router/`, `scripts/decision-gate-interceptor.py`, `scripts/hybrid-router-daemon.py`, `config/routing_policy.json`, `config/anti_pattern_rules.json`
-- 오픈소스: Laya(`engines/laya/`, convaiinnovations, Apache-2.0), aurelio-labs semantic-router, lm-sys RouteLLM, dottxt-ai Outlines, microsoft guidance — 모두 방법론·구조 차용 대상이며 의존성 추가는 Phase 별 승인 항목에 포함
-- 이 세션 실측 원자료: 스크래치패드(비보존). Phase 1.1 에서 저장소 내 재측정으로 대체
+- 오픈소스(방법론 차용): Laya(`engines/laya/`, Apache-2.0), aurelio-labs semantic-router, lm-sys RouteLLM, dottxt-ai Outlines, microsoft guidance — 의존성 추가는 해시 핀과 함께 별도 승인
+- v0.1 전문: git `74ec602:docs/PLAN_ZTC_topology_optimization.md`
