@@ -1,0 +1,11 @@
+# PostToolUseFailure 설치판 첫 실측 — main bb1ddbe, 2026-09-25 00:4x KST
+Claude Code: 2.1.281 (Claude Code), 노드 richardkim-macpro-macbookpro, 데몬 수동 기동(포트 9876, launchd 없음)
+프로브: Bash 'ls /nonexistent-ztc-probe-dir; exit 3'
+
+## hook_events (마스킹된 클라이언트 기록, 해당 호출)
+{'outcome': 'ok', 'event': 'PostToolUseFailure', 'program': 'ls', 'exit_code': 3, 'response_keys': None, 'rpc_ms': 1.567, 'client_ms': 1.695}
+## router_events (데몬)
+{'event': 'PostToolUseFailure', 'program': 'ls', 'exit_code': 3, 'source': 'miss', 'queued': 'queued', 'handle_ms': 0.109}
+
+판정: 실패한 Bash 에서 PostToolUseFailure 가 발화했고(PostToolUse 는 발화하지 않음 — 트랙 A 실측과 일치), error 첫 줄의 종료 코드 3 이 파싱됐다. 훅 stdout 은 {}(이 세션 도구 흐름 정상).
+관찰: 명령이 'VAR=… ;' 로 시작하면 program 이 환경변수 할당으로 잡힌다(마스킹됨, 판정 영향 없음). 개선 후보.

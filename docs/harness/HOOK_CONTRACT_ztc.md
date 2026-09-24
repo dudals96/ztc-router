@@ -102,7 +102,7 @@
 | 항목 | 확인 방법 | 시점 |
 |---|---|---|
 | PostToolUse Bash `tool_response` 필드 | G3 등록 후 첫 표본(마스킹 후 키 이름만 기록) | W3 |
-| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | 트랙 A G3 실측: 실패한 Bash 는 PostToolUse 미발화. 문서: PostToolUseFailure 는 "After a tool call fails". **등록 완료(2026-09-24).** 설치판 페이로드 첫 실측 필요 | 등록 직후 |
+| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | 트랙 A G3 실측: 실패한 Bash 는 PostToolUse 미발화. 문서: PostToolUseFailure 는 "After a tool call fails". **등록 완료(2026-09-24).** [실측] 설치판 첫 실측: 실패한 Bash(exit 3)에서 PostToolUseFailure 발화, 종료 코드 파싱 확인(`docs/evidence/ztc-phase1-merge-20260924/posttoolusefailure_first_live_20260924.txt`) | 완료 |
 | `updatedToolOutput` CLI 지원 | 격리 fixture 세션에서만. 공유 settings 에 넣지 않는다 | Phase 2 전 |
 | Codex hooks.json 실행 | Codex 세션에서 무해 훅(파일 1행 기록) 실측 | Phase 2 이후, 별도 승인 |
 | Antigravity | [문서-B] 확보됨. 설치판 fixture 후 | 미정 |
