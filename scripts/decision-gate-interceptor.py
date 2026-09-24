@@ -3,10 +3,10 @@
 decision-gate-interceptor.py
 PreToolUse & PostToolUse Interceptor for Coding Agents (Claude Code, Anti-Gravity IDE, Codex).
 Detects anti-patterns:
-  1. Excessive Skill Generation: Intercepts ad-hoc classifier/skill creation and injects Laya decisions.
-  2. Repetitive Error Loops: Intercepts command failures, diagnoses root cause in 18ms, and injects prescriptions.
-Maximizes token cost-efficiency by short-circuiting bloated LLM reasoning.
-Logs all interventions to learning/interventions.jsonl.
+  1. Excessive Skill Generation: Applies the configured file-path rule.
+  2. Repetitive Error Loops: Classifies failed-command text with local keyword rules.
+Token and cost savings are unmeasured; returned actions do not prove resolution.
+Logs detailed intervention events to the configured router data directory.
 """
 
 import os
@@ -22,7 +22,8 @@ from urllib.error import URLError
 
 REPO_ROOT = os.environ.get("PI_REPO_ROOT", str(Path(__file__).resolve().parent.parent))
 RULES_CONFIG_PATH = os.path.join(REPO_ROOT, "config", "anti_pattern_rules.json")
-LOG_PATH = os.path.join(REPO_ROOT, "learning", "interventions.jsonl")
+PI_ROUTER_HOME = Path(os.environ.get("PI_ROUTER_HOME", Path.home() / ".pi-router" / "luna")).expanduser()
+LOG_PATH = PI_ROUTER_HOME / "interventions.jsonl"
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
 
 # Fallback local import if daemon is unreachable
@@ -58,10 +59,9 @@ class DecisionGateInterceptor:
             with urlopen(req, timeout=1.5) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception:
-            # Immediate local in-memory fallback (<18ms)
             return self.laya_fallback.predict(content)
 
-    def log_intervention(self, intervention_type: str, description: str, tokens_saved: int, latency_ms: float, metadata: Dict[str, Any]):
+    def log_intervention(self, intervention_type: str, description: str, latency_ms: float, metadata: Dict[str, Any]):
         """Append intervention event to learning/interventions.jsonl."""
         entry = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z") or "2026-09-22T23:15:00+09:00",
@@ -69,28 +69,28 @@ class DecisionGateInterceptor:
             "intervention_type": intervention_type,
             "description": description,
             "agent_state": "intervened_by_decision_engine",
-            "tokens_saved": tokens_saved,
+            "tokens_saved": None,
+            "savings_status": "unmeasured",
             "latency_ms": latency_ms,
+            "latency_kind": "measured_wall_clock",
             "metadata": metadata
         }
-        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
+        log_path = Path(LOG_PATH)
+        log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     @staticmethod
-    def format_telemetry_hud(title: str, tokens_saved: int, latency_ms: float, anti_pattern: str, prescription: str) -> str:
-        cost_saved_usd = round(tokens_saved * 0.000015, 3) # Based on ~$0.015/1k blended rate for Claude 3.7 Sonnet
-        est_llm_time_sec = round(tokens_saved / 500, 1) # ~500 tok/sec CoT generation
-        time_reduction = round((1 - (latency_ms / 1000) / max(est_llm_time_sec, 1)) * 100, 1)
-        
+    def format_telemetry_hud(title: str, latency_ms: float, anti_pattern: str, prescription: str) -> str:
         hud = [
             "┌──────────────────────────────────────────────────────────────────────────┐",
             f"│ ⚡ {title.center(68)} │",
             "├──────────────────────────────────────────────────────────────────────────┤",
-            f"│ 💸 방지된 낭비 토큰 : {f'{tokens_saved:,} Tokens (약 ${cost_saved_usd:.2f} 절약)'.ljust(48)} │",
-            f"│ ⏱️ 실제 해결 시간   : {f'{latency_ms:.1f} ms (대기시간 ~{est_llm_time_sec}초 ➔ {latency_ms/1000:.2f}초, {time_reduction}% 단축)'.ljust(48)} │",
-            f"│ 🛡️ 차단된 안티패턴 : {anti_pattern[:48].ljust(48)} │",
-            f"│ 🎯 즉시 주입 처방   : {prescription[:48].ljust(48)} │",
+            f"│ 💸 절감: 미측정 (토큰·비용; 비교 기준선 없음)".ljust(76) + "│",
+            f"│ ⏱️ 판정 경로 시간 : {f'{latency_ms:.2f} ms (wall-clock)'.ljust(48)} │",
+            f"│ 🛡️ 일치 규칙      : {anti_pattern[:48].ljust(48)} │",
+            f"│ 🧭 제안된 다음 조치: {prescription[:48].ljust(48)} │",
             "└──────────────────────────────────────────────────────────────────────────┘"
         ]
         return "\n".join(hud)
@@ -117,14 +117,12 @@ class DecisionGateInterceptor:
                 task_type="issue_component_tagging",
                 content={"intent": "avoid redundant skill", "source": code_content[:300]}
             )
-            elapsed_ms = round((time.perf_counter() - t0) * 1000 + 18.0, 2)
-            tokens_saved = skill_rule.get("tokens_saved_estimate", 8500)
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
             decision_val = decision_res.get("decision", "syntax_compile")
 
             # Generate visual HUD card
             hud_card = self.format_telemetry_hud(
-                title="[LAURA-ROUTER] 과도한 스킬 생성 차단 — 0토큰 즉시 해결",
-                tokens_saved=tokens_saved,
+                title="규칙 기반 스킬 생성 차단",
                 latency_ms=elapsed_ms,
                 anti_pattern=f"불필요한 스킬 파일 생성 ({os.path.basename(target_file)})",
                 prescription=f"Laya 판정 [{decision_val}] 즉시 적용"
@@ -135,7 +133,6 @@ class DecisionGateInterceptor:
             self.log_intervention(
                 intervention_type="directive",
                 description=desc,
-                tokens_saved=tokens_saved,
                 latency_ms=elapsed_ms,
                 metadata={"blocked_file": target_file, "decision": decision_val}
             )
@@ -143,14 +140,16 @@ class DecisionGateInterceptor:
             return {
                 "permission": "intercepted",
                 "blocked": True,
-                "reason": "FORBIDDEN_SKILL_OVERHEAD: 이미 백그라운드 Laya 의사결정엔진(http://127.0.0.1:9876)이 동작 중입니다. 도구를 직접 새로 만들지 마십시오.",
+                "reason": "FORBIDDEN_SKILL_OVERHEAD: configured file-path rule matched.",
                 "visual_hud": hud_card,
                 "injected_prescription": {
                     "status": "OVERRIDDEN_BY_DECISION_ENGINE",
                     "decision": decision_val,
                     "action_required": "스킬 파일 생성을 취소하고, Laya 엔진의 판정 결과를 직접 사용하여 다음 작업을 진행하십시오.",
                     "latency_ms": elapsed_ms,
-                    "tokens_saved": tokens_saved,
+                    "latency_kind": "measured_wall_clock",
+                    "tokens_saved": None,
+                    "savings_status": "unmeasured",
                     "hud_card": hud_card
                 }
             }
@@ -159,7 +158,7 @@ class DecisionGateInterceptor:
 
     def intercept_post_tool_use(self, tool_name: str, command: str, exit_code: int, output_text: str) -> Optional[Dict[str, Any]]:
         """
-        Check if a command failed. If so, diagnose with Laya in 18ms and inject prescription.
+        Classify failed-command text with local rules and return a suggested action.
         """
         error_rule = self.rules.get("error_loop_short_circuit", {})
         if not error_rule.get("enabled", True) or exit_code == 0:
@@ -171,8 +170,7 @@ class DecisionGateInterceptor:
             task_type="build_error_branching",
             content={"log": output_text[-500:], "command": command}
         )
-        elapsed_ms = round((time.perf_counter() - t0) * 1000 + 18.2, 2)
-        tokens_saved = error_rule.get("tokens_saved_estimate", 12000)
+        elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
 
         error_class = decision_res.get("decision", "syntax_compile")
         signatures = error_rule.get("error_signatures", {}).get(error_class, {})
@@ -180,18 +178,16 @@ class DecisionGateInterceptor:
 
         # Generate visual HUD card
         hud_card = self.format_telemetry_hud(
-            title="[LAURA-ROUTER] 반복 에러 루프 단절 — 18ms 확정 처방 주입",
-            tokens_saved=tokens_saved,
+            title="실패 출력의 규칙 기반 분류",
             latency_ms=elapsed_ms,
             anti_pattern=f"명령어 '{command.split()[0]}' 에러 루프 진입 징후",
             prescription=f"[{error_class}] {prescribed_action}"
         )
 
-        desc = f"[LOOP SHORT-CIRCUITED] Command '{command.split()[0]}' failed with exit code {exit_code}. Diagnosed as '{error_class}' in {elapsed_ms}ms."
+        desc = f"[HEURISTIC CLASSIFICATION] Command '{command.split()[0]}' failed with exit code {exit_code}. Classified as '{error_class}' in {elapsed_ms}ms."
         self.log_intervention(
             intervention_type="directive",
             description=desc,
-            tokens_saved=tokens_saved,
             latency_ms=elapsed_ms,
             metadata={"command": command, "error_class": error_class}
         )
@@ -203,8 +199,10 @@ class DecisionGateInterceptor:
             "prescribed_action": prescribed_action,
             "visual_hud": hud_card,
             "prompt_injection": f"\n[SYSTEM DECISION ENGINE OVERRIDE]\n{hud_card}\n* 지침: 장황한 분석이나 도구 작성을 중단하고 위 처방대로 직접 조치하십시오.\n",
-            "tokens_saved": tokens_saved,
-            "latency_ms": elapsed_ms
+            "tokens_saved": None,
+            "savings_status": "unmeasured",
+            "latency_ms": elapsed_ms,
+            "latency_kind": "measured_wall_clock",
         }
 
 

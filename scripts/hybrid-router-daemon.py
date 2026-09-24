@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
 hybrid-router-daemon.py
-Background Daemon for Laya/Jev Hybrid Decision Engine (Codename: HYBRID-ROUTER).
+Local daemon for the configurable keyword-heuristic router.
 Features:
-  1. Multi-node Tailnet Echo Ping pre-flight verification.
-  2. Local-first Laya sub-40ms execution + Jev Commercial API Gateway.
-  3. HTTP REST & JSON-RPC listener for IDE sidebar extensions & CLI tools.
-  4. Broadcasts 'Laya/Jev Hybrid Daemon Ready' signal upon entering listener state.
+  1. HTTP listener for router status, telemetry, and dispatch.
+  2. Routing through keyword heuristics or a local keyword-match simulation.
 """
 
 import os
@@ -20,6 +18,7 @@ from threading import Thread
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+PI_ROUTER_HOME = Path(os.environ.get("PI_ROUTER_HOME", Path.home() / ".pi-router" / "luna")).expanduser()
 sys.path.insert(0, str(REPO_ROOT / "engines" / "hybrid_router"))
 from router_core import HybridDecisionRouter
 
@@ -32,6 +31,36 @@ TAILNET_NODES = {
 
 ROUTER_PORT = 9876
 router_instance = None
+
+
+def load_telemetry_data(log_path):
+    events = []
+    if log_path.exists():
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                    if event.get("cycle") == "hybrid-router-intervention":
+                        events.append(event)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+    measured_latencies = [
+        event["latency_ms"]
+        for event in events
+        if event.get("latency_kind") == "measured_wall_clock"
+        and isinstance(event.get("latency_ms"), (int, float))
+    ]
+    return {
+        "interventions_count": len(events),
+        "savings_status": "unmeasured",
+        "avg_latency_ms": round(sum(measured_latencies) / len(measured_latencies), 2) if measured_latencies else None,
+        "latency_samples": len(measured_latencies),
+        "recent_events": events[-10:]
+    }
 
 
 def run_echo_ping_verification():
@@ -76,7 +105,7 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             status_payload = {
                 "status": "ready",
-                "signal": "Laya/Jev Hybrid Daemon Ready",
+                "signal": "Keyword heuristic router ready",
                 "daemon": "HYBRID-ROUTER",
                 "port": ROUTER_PORT,
                 "timestamp": time.time()
@@ -88,35 +117,8 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             
-            # Aggregate stats from interventions.jsonl
-            log_path = "/Users/richardkim-macpro/Pi/learning/interventions.jsonl"
-            total_tokens = 0
-            total_latency = 0.0
-            events = []
-            if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line: continue
-                        try:
-                            d = json.loads(line)
-                            if "tokens_saved" in d:
-                                total_tokens += d.get("tokens_saved", 0)
-                                total_latency += d.get("latency_ms", 0.0)
-                                events.append(d)
-                        except Exception:
-                            pass
-            
-            count = len(events)
-            avg_lat = round(total_latency / max(count, 1), 2)
-            telemetry_data = {
-                "interventions_count": count,
-                "total_tokens_saved": total_tokens,
-                "est_cost_saved_usd": round(total_tokens * 0.000015, 2),
-                "avg_latency_ms": avg_lat,
-                "est_time_saved_sec": round(total_tokens / 500, 1),
-                "recent_events": events[-10:]
-            }
+            log_path = PI_ROUTER_HOME / "interventions.jsonl"
+            telemetry_data = load_telemetry_data(log_path)
             self.wfile.write(json.dumps(telemetry_data).encode("utf-8"))
 
         elif self.path == "/dashboard" or self.path == "/":
@@ -128,7 +130,7 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>HYBRID-ROUTER 의사결정엔진 토큰 가시화 대시보드</title>
+  <title>HYBRID-ROUTER 규칙 분류 telemetry</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
@@ -206,8 +208,8 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
   <div class="container">
     <header>
       <div>
-        <h1>⚡ HYBRID-ROUTER 가시화 대시보드</h1>
-        <div class="subtitle">플래그쉽 에이전트 과도 추론 방지 및 실시간 토큰 가성비 모니터링</div>
+        <h1>⚡ HYBRID-ROUTER telemetry</h1>
+        <div class="subtitle">키워드 휴리스틱 경로 관측; 절감·해결 성과는 미측정</div>
       </div>
       <div class="badge">
         <span class="dot"></span>
@@ -217,44 +219,30 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
 
     <div class="grid">
       <div class="card">
-        <div class="card-title">방지된 낭비 토큰 (Tokens Saved)</div>
-        <div class="card-val green" id="stat-tokens">-</div>
-        <div class="card-desc" id="stat-cost">약 $0.00 상당 LLM 비용 절감</div>
+        <div class="card-title">토큰·비용 절감</div>
+        <div class="card-val green" id="stat-savings">미측정</div>
+        <div class="card-desc">비교 기준선 없음</div>
       </div>
       <div class="card">
-        <div class="card-title">실제 해결 소요시간 (Avg Latency)</div>
+        <div class="card-title">판정 경로 시간 평균</div>
         <div class="card-val blue" id="stat-lat">-</div>
-        <div class="card-desc">Laya Apple M5 온칩 18ms 추론</div>
+        <div class="card-desc">측정된 wall-clock 표본만 표시</div>
       </div>
       <div class="card">
-        <div class="card-title">절약된 대기시간 (Time Saved)</div>
-        <div class="card-val green" id="stat-time">-</div>
-        <div class="card-desc" id="stat-speedup">기존 CoT 생성 대비 800배+ 고속화</div>
+        <div class="card-title">해결 성과</div>
+        <div class="card-val green" id="stat-resolution">미측정</div>
+        <div class="card-desc">분류 결과만으로 해결을 판정하지 않음</div>
       </div>
       <div class="card">
-        <div class="card-title">강제 개입 횟수 (Interventions)</div>
+        <div class="card-title">규칙 분류 이벤트</div>
         <div class="card-val" id="stat-count">-</div>
-        <div class="card-desc">스킬 생성 차단 & 에러 루프 단절</div>
+        <div class="card-desc">이벤트 수는 해결 횟수가 아님</div>
       </div>
     </div>
 
     <div class="comparison-section">
-      <h3>⏱️ 반응 속도 및 토큰 소모 직관적 비교</h3>
-      <div class="comp-bar">
-        <div class="bar-row">
-          <div class="bar-label">🔴 플래그쉽 LLM (CoT 추론)</div>
-          <div class="bar-track"><div class="bar-fill fill-red" style="width: 100%;"></div></div>
-          <div class="bar-time" style="color: #f87171;">~15.0 초</div>
-        </div>
-        <div class="bar-row">
-          <div class="bar-label">🟢 Laya 엔진 강제 개입</div>
-          <div class="bar-track"><div class="bar-fill fill-green" style="width: 2%;"></div></div>
-          <div class="bar-time" style="color: #34d399;">0.02 초</div>
-        </div>
-      </div>
-      <div style="font-size: 0.8rem; color: var(--text-muted); text-align: right;">
-        * 불필요한 생각(CoT)을 물리적으로 생략하여 99.8% 시간 및 100% 토큰 절감
-      </div>
+      <h3>현재 판정 방식</h3>
+      <p>로컬 키워드 휴리스틱과 로컬 키워드 일치 시뮬레이션을 사용합니다. 모델 추론, 토큰·비용 절감, 실제 해결 여부는 이 telemetry로 입증되지 않습니다.</p>
     </div>
 
     <div class="comparison-section">
@@ -264,9 +252,9 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
           <tr>
             <th>시각</th>
             <th>구분</th>
-            <th>방지 토큰</th>
-            <th>해결 속도</th>
-            <th>차단된 안티패턴 및 처방 내용</th>
+            <th>절감</th>
+            <th>판정 경로 시간</th>
+            <th>이벤트 유형</th>
           </tr>
         </thead>
         <tbody id="events-table">
@@ -281,25 +269,24 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
       try {
         const res = await fetch('/telemetry');
         const data = await res.json();
-        document.getElementById('stat-tokens').innerText = Number(data.total_tokens_saved).toLocaleString() + ' tok';
-        document.getElementById('stat-cost').innerText = '약 $' + data.est_cost_saved_usd.toFixed(2) + ' 상당 LLM 비용 절약';
-        document.getElementById('stat-lat').innerText = data.avg_latency_ms.toFixed(1) + ' ms';
-        document.getElementById('stat-time').innerText = data.est_time_saved_sec.toFixed(1) + ' 초';
+        document.getElementById('stat-savings').innerText = '미측정';
+        document.getElementById('stat-lat').innerText = Number.isFinite(data.avg_latency_ms) ? data.avg_latency_ms.toFixed(2) + ' ms' : '미측정';
+        document.getElementById('stat-resolution').innerText = '미측정';
         document.getElementById('stat-count').innerText = data.interventions_count + ' 회';
 
         const tbody = document.getElementById('events-table');
         if (data.recent_events && data.recent_events.length > 0) {
           tbody.innerHTML = data.recent_events.reverse().map(ev => {
             const time = (ev.timestamp || '').split('T')[1]?.substring(0, 8) || '-';
-            const isSkill = (ev.description || '').includes('skill');
+            const isSkill = ev.intervention_type === 'directive';
             const pillClass = isSkill ? 'pill-blue' : 'pill-green';
-            const typeLabel = isSkill ? '스킬생성차단' : '에러루프단절';
+            const typeLabel = ev.intervention_type || '분류 이벤트';
             return `<tr>
               <td>${time}</td>
               <td><span class="pill ${pillClass}">${typeLabel}</span></td>
-              <td style="font-weight:700; color:#34d399;">+${Number(ev.tokens_saved || 0).toLocaleString()} tok</td>
-              <td>${Number(ev.latency_ms || 0).toFixed(1)} ms</td>
-              <td>${ev.description || '-'}</td>
+              <td>미측정</td>
+              <td>${ev.latency_kind === 'measured_wall_clock' && Number.isFinite(ev.latency_ms) ? Number(ev.latency_ms).toFixed(2) + ' ms' : '미측정'}</td>
+              <td>규칙 기반 분류; 해결 성과 미측정</td>
             </tr>`;
           }).join('');
         }
@@ -351,18 +338,18 @@ def start_daemon():
     # 1. Run Pre-Flight Echo Ping
     run_echo_ping_verification()
     
-    # 2. Warm up Laya & Jev pipelines
+    # 2. Warm up local routing paths
     warmup_task = {"task_type": "build_error_branching", "content": {"log": "init warmup"}}
     warmup_res = router_instance.dispatch(warmup_task)
     print(f"[WARMUP] Local Engine Warmup Completed. Latency: {warmup_res['total_pipeline_latency_ms']}ms")
 
     # 3. Emit the required readiness signal
     print("\n" + "="*70)
-    print(">>> [SIGNAL] Laya/Jev Hybrid Daemon Ready <<<")
+    print(">>> [SIGNAL] Keyword heuristic router ready <<<")
     print("======================================================================")
     print(f"[*] Background Listener active on http://127.0.0.1:{ROUTER_PORT}")
     print(f"[*] Serving Anti-Gravity Sidebar Extension & CLI Clients")
-    print(f"[*] Mode: AUTOMODE=TRUE | Topology: 4-Node Tailnet Mesh")
+    print("[*] Mode: local keyword heuristics and keyword-match simulation")
     print("======================================================================\n")
 
     # 4. Start HTTP Server (bind 0.0.0.0 to allow Tailnet peers access)

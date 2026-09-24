@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
 jev_client.py
-Commercial Jev API Gateway with Built-In Deadman's Switch (Circuit Breaker).
-When upstream Jev API encounters timeouts, rate limits (429), or network dropouts,
-it instantaneously transfers traffic to the local Laya decision engine.
+Local keyword-matching simulation with a circuit-breaker-shaped fallback.
+The Jev path below makes no HTTP request and does not run model inference.
 """
 
 import os
 import sys
 import json
 import time
+from pathlib import Path
 from typing import Dict, Any, List, Optional
-from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 # Import local Laya engine as fallback
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,20 +18,17 @@ from hierarchical_routing.hierarchical_engine import LayaHierarchicalEngine
 
 
 class CircuitBreakerState:
-    CLOSED = "CLOSED"      # Normal operation: routing through Jev API
-    OPEN = "OPEN"          # Tripped: all traffic diverted to local Laya
+    CLOSED = "CLOSED"      # Normal operation: local Jev-path simulation
+    OPEN = "OPEN"          # Tripped: calls use local keyword fallback
     HALF_OPEN = "HALF_OPEN"# Probing recovery
 
 
 class JevGatewayClient:
     def __init__(self, config_path: Optional[str] = None):
         if not config_path:
-            config_path = "/Users/richardkim-macpro/Pi/config/jev_config.json"
+            config_path = str(Path(__file__).resolve().parents[3] / "config" / "jev_config.json")
         
         self.config = self._load_config(config_path)
-        self.api_key = os.getenv(self.config.get("api_key_env", "JEV_API_KEY"), self.config.get("default_api_key_stub", "jev_stub_key"))
-        self.endpoint = os.getenv("JEV_ENDPOINT", self.config.get("endpoint", "https://api.typesafe.ai/v1/decision"))
-        self.timeout_ms = self.config.get("timeout_ms", 500)
         
         # Circuit Breaker attributes
         cb_conf = self.config.get("circuit_breaker", {})
@@ -46,7 +41,7 @@ class JevGatewayClient:
         self.failure_count = 0
         self.last_failure_time = 0.0
         
-        # Local fallback engine
+        # Local keyword-heuristic fallback
         self.local_laya = LayaHierarchicalEngine()
 
     def _load_config(self, path: str) -> Dict[str, Any]:
@@ -54,7 +49,7 @@ class JevGatewayClient:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {
-            "endpoint": "https://api.typesafe.ai/v1/decision",
+            "mode": "simulated_keyword_match",
             "circuit_breaker": {"enabled": True, "failure_threshold": 3, "recovery_timeout_seconds": 30}
         }
 
@@ -72,35 +67,31 @@ class JevGatewayClient:
     def _record_failure(self, reason: str):
         self.failure_count += 1
         self.last_failure_time = time.time()
-        print(f"[!] Jev API Gateway Warning: Failure #{self.failure_count}/{self.failure_threshold} ({reason})")
+        print(f"[!] Simulated route warning: Failure #{self.failure_count}/{self.failure_threshold} ({reason})")
         if self.failure_count >= self.failure_threshold:
             self.state = CircuitBreakerState.OPEN
-            print("[DEADMAN SWITCH ACTIVATED] Circuit Breaker tripped to OPEN! Diverting all traffic to local Laya engine.")
+            print("[LOCAL FALLBACK] Circuit breaker opened; using keyword heuristic fallback.")
 
     def route_decision(self, state: Dict[str, Any], options: List[str], instructions: str = "Select the best option", force_fail: bool = False) -> Dict[str, Any]:
         """
-        Execute decision via commercial Jev API.
-        If Circuit Breaker is OPEN or call fails/times out, seamlessly fallback to Laya.
+        Execute a local simulated result or use keyword fallback after failure.
         """
         t0 = time.perf_counter()
         self._check_circuit_health()
 
         # If Circuit Breaker is OPEN, bypass Jev completely and route to Laya
         if self.state == CircuitBreakerState.OPEN and not force_fail:
-            print("[Circuit Breaker OPEN] Bypassing Jev API. Directing request to Local Laya Inference Engine.")
+            print("[Circuit Breaker OPEN] Using local heuristic keyword fallback.")
             fallback_res = self.local_laya.fallback_resolve(state, options)
             fallback_res["circuit_breaker_state"] = self.state
             fallback_res["deadman_switch_triggered"] = True
             return fallback_res
 
-        # Attempt Jev API Call
         try:
             if force_fail:
-                raise ConnectionError("Simulated upstream network partition / gateway 504")
+                raise ConnectionError("Simulated route failure")
 
-            # In production environment, this dispatches real HTTP POST to Jev endpoint
-            # If endpoint is unreachable or stub, simulate controlled API resolution or fallback
-            res = self._execute_jev_call(state, options, instructions)
+            res = self._simulate_keyword_match(state, options)
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
             
             if elapsed_ms > self.latency_ceiling_ms:
@@ -114,18 +105,14 @@ class JevGatewayClient:
 
         except Exception as exc:
             self._record_failure(str(exc))
-            print(f"[*] Executing Instant Fallback to Local Laya Decision Engine... Reason: {exc}")
+            print(f"[*] Executing local heuristic fallback... Reason: {exc}")
             fallback_res = self.local_laya.fallback_resolve(state, options)
             fallback_res["circuit_breaker_state"] = self.state
             fallback_res["deadman_switch_triggered"] = True
             fallback_res["upstream_error"] = str(exc)
             return fallback_res
 
-    def _execute_jev_call(self, state: Dict[str, Any], options: List[str], instructions: str) -> Dict[str, Any]:
-        """Execute Jev API call or high-accuracy zero-shot decision."""
-        # Simulated fast Jev commercial response (or real HTTP if network responds)
-        time.sleep(0.045) # 45ms external API roundtrip simulation
-        
+    def _simulate_keyword_match(self, state: Dict[str, Any], options: List[str]) -> Dict[str, Any]:
         # Determine candidate with highest contextual score
         text_repr = str(state).lower()
         scored = []
@@ -138,11 +125,12 @@ class JevGatewayClient:
         winner = scored[0][0] if scored else options[0]
         
         return {
-            "engine": "jev-commercial-api",
+            "engine": "simulated-jev-keyword-match",
+            "decision_method": "keyword_overlap",
+            "model_inference_performed": False,
             "decision": winner,
-            "confidence": 0.98,
             "options_count": len(options),
-            "mode": "zero_shot_decision",
+            "mode": "simulated_keyword_match",
             "status": "success"
         }
 
@@ -150,7 +138,7 @@ class JevGatewayClient:
 if __name__ == "__main__":
     client = JevGatewayClient()
     
-    print("=== TEST 1: Normal Jev Routing with >20 Categories ===")
+    print("=== TEST 1: Local Keyword-Match Simulation ===")
     large_options = [f"category_service_alpha_{i}" for i in range(25)]
     large_options.append("category_service_alpha_core_pipeline")
     test_state = {"context": "Fatal exception in core pipeline message broker", "severity": "HIGH"}
@@ -158,9 +146,9 @@ if __name__ == "__main__":
     res1 = client.route_decision(test_state, large_options)
     print(f"Decision: {res1.get('decision')} | Engine: {res1.get('engine')} | Latency: {res1.get('latency_ms')}ms | CB State: {res1.get('circuit_breaker_state')}\n")
 
-    print("=== TEST 2: Circuit Breaker & Deadman's Switch Trigger (3 Failures) ===")
+    print("=== TEST 2: Simulated Route Failures ===")
     for i in range(3):
-        print(f"--- Simulating Network Failure #{i+1} ---")
+        print(f"--- Simulating route failure #{i+1} ---")
         client.route_decision(test_state, large_options, force_fail=True)
 
     print("\n=== TEST 3: Subsequent Call while Circuit Breaker is OPEN ===")

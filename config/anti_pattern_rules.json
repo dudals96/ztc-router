@@ -5,11 +5,11 @@
 	"codename": "DECISION-GATE-INTERCEPTOR",
 	"created_at": "2026-09-22T23:15:00+09:00",
 	"laya_daemon_url": "http://127.0.0.1:9876",
-	"intervention_log_path": "learning/interventions.jsonl",
+	"intervention_log_path": "${PI_ROUTER_HOME}/interventions.jsonl",
 	"rules": {
 		"skill_generation_interception": {
 			"enabled": true,
-			"description": "Block agents from generating ad-hoc skill files or one-off classifiers when Laya engine is already available",
+			"description": "Apply configured path rules; token and cost savings are unmeasured",
 			"target_tools": ["write_to_file", "replace_file_content"],
 			"file_path_patterns": [
 				"(?:^|/)skills/.*\\.skill\\.md$",
@@ -20,12 +20,11 @@
 				".*_triage\\.py$",
 				".*classify.*\\.sh$"
 			],
-			"action": "INTERCEPT_AND_OVERRIDE",
-			"tokens_saved_estimate": 8500
+			"action": "INTERCEPT_AND_OVERRIDE"
 		},
 		"error_loop_short_circuit": {
 			"enabled": true,
-			"description": "Intercept command execution failures, evaluate root cause via Laya within 18ms, and inject deterministic fix prescription",
+			"description": "Classify matching command failures with local keyword rules; resolution is not measured",
 			"target_tools": ["run_command"],
 			"consecutive_failure_threshold": 1,
 			"error_signatures": {
@@ -65,16 +64,15 @@
 					"prescribed_action": "Requires human operator privilege or secret credential. Halt autonomous retry loop immediately."
 				}
 			},
-			"action": "INJECT_PRESCRIPTION",
-			"tokens_saved_estimate": 12000
+			"action": "INJECT_PRESCRIPTION"
 		},
 		"telemetry_progress_trigger": {
 			"enabled": true,
-			"description": "Automatically trigger and execute visual telemetry script at the 75% stage of the designed project lifecycle",
+			"description": "Manual CLI milestone report; no project lifecycle trigger is wired",
 			"trigger_percentage": 75,
 			"target_script": "scripts/hybrid-router-cli.py",
 			"target_command": "savings",
-			"action": "AUTO_EXECUTE_VISUAL_TELEMETRY",
+			"action": "DISPLAY_MANUAL_TELEMETRY",
 			"milestone_stages": [
 				{ "stage": 1, "name": "Pre-flight Resource Audit", "weight": 25 },
 				{

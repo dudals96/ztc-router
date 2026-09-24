@@ -4,23 +4,10 @@
 	"policy_name": "Hybrid Decision Engine Routing Policy",
 	"codename": "HYBRID-ROUTER (LAURA-PIPELINE)",
 	"created_at": "2026-09-22T22:15:00+09:00",
-	"nodes": {
-		"laya_inference_node": {
-			"host": "richardkim-macpro-macbookpro",
-			"tailnet_ip": "100.74.61.51",
-			"device": "mps",
-			"architecture": "Apple M5 (10-core, Metal 4 Unified Memory)"
-		},
-		"jev_gateway_node": {
-			"host": "richardkim-macpro-macbookpro",
-			"tailnet_ip": "100.74.61.51",
-			"role": "Master Gateway + Circuit Breaker"
-		}
-	},
 	"routes": {
 		"laya_route": {
-			"description": "High-speed, sub-40ms local non-autoregressive decision engine",
-			"engine": "laya-multilingual",
+			"description": "Local keyword heuristic; no model inference or latency guarantee",
+			"engine": "keyword-heuristic-hierarchical",
 			"conditions": {
 				"max_tokens": 192,
 				"max_latency_ms": 40,
@@ -40,8 +27,8 @@
 			}
 		},
 		"jev_route": {
-			"description": "Commercial API router for complex contextual analysis and high-dimensional spaces",
-			"engine": "jev-commercial-api",
+			"description": "Simulated keyword-overlap path; no external API request is made",
+			"engine": "simulated-jev-keyword-match",
 			"conditions": {
 				"min_categories": 21,
 				"task_types": [
@@ -65,25 +52,25 @@
 			"priority": 1,
 			"condition": "categories_count > 20",
 			"destination": "jev_route",
-			"reason": "Exceeds Laya single-question choice budget (max 20)"
+			"reason": "Exceeds the configured category threshold"
 		},
 		{
 			"priority": 2,
 			"condition": "latency_strict <= 40ms or tokens_count <= 192",
 			"destination": "laya_route",
-			"reason": "Requires sub-40ms on-chip local execution"
+			"reason": "Matches a configured local route constraint; this is not a latency guarantee"
 		},
 		{
 			"priority": 3,
 			"condition": "task_type in ['build_error_branching', 'github_pr_assignment', 'issue_component_tagging']",
 			"destination": "laya_route",
-			"reason": "Covered by fine-tuned 2-tier local decision schemas"
+			"reason": "Task type is listed for local heuristic handling"
 		},
 		{
 			"priority": 4,
 			"condition": "default",
 			"destination": "laya_route",
-			"reason": "Local-first privacy and latency preference"
+			"reason": "Configured local heuristic default"
 		}
 	]
 }

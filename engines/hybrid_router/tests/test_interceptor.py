@@ -11,9 +11,13 @@ Verifies:
 
 import os
 import sys
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-sys.path.insert(0, "/Users/richardkim-macpro/Pi/scripts")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from importlib import import_module
 interceptor_mod = import_module("decision-gate-interceptor")
 DecisionGateInterceptor = interceptor_mod.DecisionGateInterceptor
@@ -21,6 +25,12 @@ DecisionGateInterceptor = interceptor_mod.DecisionGateInterceptor
 
 class TestDecisionGateInterceptor(unittest.TestCase):
     def setUp(self):
+        self.log_dir = tempfile.TemporaryDirectory()
+        log_path = str(Path(self.log_dir.name) / "interventions.jsonl")
+        self.log_path_patch = patch.object(interceptor_mod, "LOG_PATH", log_path)
+        self.log_path_patch.start()
+        self.addCleanup(self.log_path_patch.stop)
+        self.addCleanup(self.log_dir.cleanup)
         self.interceptor = DecisionGateInterceptor()
 
     def test_block_redundant_skill_creation(self):
@@ -32,7 +42,9 @@ class TestDecisionGateInterceptor(unittest.TestCase):
         self.assertEqual(res["permission"], "intercepted")
         self.assertTrue(res["blocked"])
         self.assertIn("FORBIDDEN_SKILL_OVERHEAD", res["reason"])
-        self.assertGreater(res["injected_prescription"]["tokens_saved"], 0)
+        self.assertIsNone(res["injected_prescription"]["tokens_saved"])
+        self.assertEqual(res["injected_prescription"]["savings_status"], "unmeasured")
+        self.assertIn("미측정", res["visual_hud"])
 
     def test_allow_legitimate_source_file(self):
         tool_input = {
@@ -50,7 +62,19 @@ class TestDecisionGateInterceptor(unittest.TestCase):
         self.assertTrue(res["intervened"])
         self.assertEqual(res["error_class"], "syntax_compile")
         self.assertIn("[SYSTEM DECISION ENGINE OVERRIDE]", res["prompt_injection"])
-        self.assertGreater(res["tokens_saved"], 0)
+        self.assertIsNone(res["tokens_saved"])
+        self.assertEqual(res["savings_status"], "unmeasured")
+
+    def test_telemetry_hud_does_not_claim_savings(self):
+        hud = DecisionGateInterceptor.format_telemetry_hud(
+            title="heuristic result",
+            latency_ms=12.5,
+            anti_pattern="test pattern",
+            prescription="suggested next action",
+        )
+
+        self.assertIn("절감: 미측정", hud)
+        self.assertNotIn("Tokens", hud)
 
 
 if __name__ == "__main__":
