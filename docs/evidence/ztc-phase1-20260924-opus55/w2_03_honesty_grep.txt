@@ -1,0 +1,8 @@
+# 정직화 grep — 2026-09-24 19:08:18 KST, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+$ grep -rnE '18\.5|34\.2|38\.5|18\.0|18\.2|12\.0|0\.045|0\.98' engines/hybrid_router scripts/hybrid-router-daemon.py scripts/decision-gate-interceptor.py
+exit=1 (1 = 0건)
+# 참고: test_honesty.py 는 같은 정규식을 파일 안에 담고 있어 grep -r 에 걸린다(위 결과에 보이면 그 1줄뿐이어야 함).
+
+$ grep -n '18ms\|800배\|99.8%' scripts/hybrid-router-daemon.py
+128:            "note": "measured values only; earlier dashboard figures (18 ms, 800x, 99.8%) were constants, not measurements",
+143:<p>실측값만 표시한다. 에이전트에 주입되는 것은 없다. 이전 대시보드의 18 ms·800배·99.8% 는 코드 상수였다.</p>

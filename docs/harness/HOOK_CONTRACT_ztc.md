@@ -99,3 +99,14 @@
 | `updatedToolOutput` CLI 지원 | 격리 fixture 세션에서만. 공유 settings 에 넣지 않는다 | Phase 2 전 |
 | Codex hooks.json 실행 | Codex 세션에서 무해 훅(파일 1행 기록) 실측 | Phase 2 이후, 별도 승인 |
 | Antigravity | 규격 문서 확보 후 | 미정 |
+
+## 6. 운영 절차 — 자동 비활성·복귀·원복 (트랙 A 구현 기준)
+| 상황 | 동작 | 사람이 할 일 |
+|---|---|---|
+| 데몬 부재·타임아웃·403·503·잘못된 입력 | 클라이언트가 즉시 `{}`, `hook_events.jsonl` 에 outcome 1행 | 없음 |
+| 최근 50 호출 중 실패·예산 초과 > 20% (표본 ≥ 20) | `$PI_ROUTER_HOME/disabled` 표지 생성, 이후 데몬 호출 없이 `{}` + outcome `disabled` 기록 | 아래 복귀 절차 |
+| 복귀 | 자동 복귀 없음 | ① `hook_events.jsonl` 에서 실패 outcome 분포 확인 ② 원인 조치(데몬 기동 등) ③ `disabled` 와 `client_window.json` 삭제 ④ `scripts/bench/hook_bench.py` 1회 재측정 ⑤ 결과를 council entry 에 기록 |
+| 원복(훅 제거) | settings 의 router-client 항목 1개 삭제 → 즉시 무효 | 데몬 종료(`kill <pid>`), 원자료 보존 여부 결정 |
+| 원복(코드) | 트랙 브랜치 커밋 되돌리기. main 에는 D6 전까지 반영되지 않음 | — |
+
+코드 위치: 클라이언트 `scripts/hooks/router-client.sh` + `router_client.py`(상수 `WINDOW=50`, `MIN_SAMPLES=20`, `DISABLE_RATE=0.2`, `BUDGET_MS=30`), 데몬 `scripts/hybrid-router-daemon.py`, LaunchAgent 템플릿 `config/launchd/com.pi.router-daemon.plist.template`(등록 안 함).
