@@ -1,0 +1,12 @@
+# G1 RED — 수정 전(c4d0aef + 새 테스트), 2026-09-24 19:32:55 KST, cwd /Users/richardkim-macpro/Pi-wt/ztc-opus55
+FAIL: test_allowed_commands_defer (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_allowed_commands_defer)
+FAIL: test_blocked_commands_ask_in_prompt_modes (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_blocked_commands_ask_in_prompt_modes)
+FAIL: test_blocked_commands_deny_in_promptless_modes (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_blocked_commands_deny_in_promptless_modes)
+FAIL: test_log_is_repo_relative_not_literal_c_drive (test_tier2_gate_wrapper.TestBlockedAndAllowed.test_log_is_repo_relative_not_literal_c_drive)
+FAIL: test_gate_crash (test_tier2_gate_wrapper.TestBrokenGateAsks.test_gate_crash)
+FAIL: test_gate_script_missing (test_tier2_gate_wrapper.TestBrokenGateAsks.test_gate_script_missing)
+FAIL: test_python_missing (test_tier2_gate_wrapper.TestBrokenGateAsks.test_python_missing)
+FAIL: test_claude_settings_command_runs_wrapper (test_tier2_gate_wrapper.TestSettingsCommand.test_claude_settings_command_runs_wrapper)
+FAIL: test_codex_hooks_command_uses_wrapper (test_tier2_gate_wrapper.TestSettingsCommand.test_codex_hooks_command_uses_wrapper)
+Ran 9 tests in 0.038s
+FAILED (failures=9)
