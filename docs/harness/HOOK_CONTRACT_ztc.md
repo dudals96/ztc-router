@@ -1,7 +1,7 @@
 # HOOK_CONTRACT_ztc — 에이전트별 훅 계약표 (ZTC Phase 1)
 
-- Status: **DRAFT (트랙 A: Opus 5.5 초안)** — G0 승인 대상. 병렬 초안 모드(`tasks/ztc-phase1-dual-draft__merge-protocol.md`)이므로 머지 전까지 트랙 B 초안과 별개다.
-- 작성: Claude Code (Opus 5.5) @ richardkim-macpro-macbookpro, 2026-09-24, worktree `~/Pi-wt/ztc-opus55`
+- Status: **머지본 (D5, 2026-09-24)** — 트랙 A(Opus 5.5) 초안을 기반으로 트랙 B(Luna) 계약표의 Codex·Antigravity 공식 문서 행을 접목했다. 머지 규약 `tasks/ztc-phase1-dual-draft__merge-protocol.md`, 비교 `docs/evidence/ztc-phase1-merge-20260924/comparison.md`.
+- 작성: 트랙 A Claude Code (Opus 5.5) 초안 + 트랙 B Codex (Luna) 계약표 행, 머지 담당 Claude Code @ richardkim-macpro-macbookpro
 - 상위 문서: `docs/PLAN_ZTC_topology_optimization.md` v0.3 §4·§5, 평가 규약 `docs/harness/EVAL_PROTOCOL_ztc.md`
 - 근거: `docs/evidence/ztc-plan-review-20260924/claude-code-verification-A1-A12.md`(2차 회신 절 포함), `astra-review-2.md`, 이 세션 설치판 계수 `docs/evidence/ztc-phase1-20260924-opus55/w1_installed_binary_strings.txt`
 
@@ -12,6 +12,7 @@
 | [설치판] | 설치된 바이너리 문자열 계수 | 기능 **후보**일 뿐. 실행 의미를 증명하지 않는다 |
 | [문서-ref] | Claude Code hooks 레퍼런스(code.claude.com/docs/en/hooks) 인용. 09-24 검증 세션이 직접 조회, 이 세션은 재조회하지 않음 | 문서가 약속하는 것. 설치판 동작과 다를 수 있다 |
 | [문서-sdk] | Agent SDK hooks 페이지 인용 | CLI command 훅에 그대로 적용된다고 보지 않는다 |
+| [문서-B] | 트랙 B 가 2026-09-24 조회한 공식 문서(Claude Code·OpenAI Codex·Google Antigravity hooks 페이지, URL 은 §7) | 문서가 약속하는 것. 머지 담당은 재조회하지 않았다 |
 | [실측] | 이 저장소 증거 폴더에 원자료가 있는 측정 | 그 노드·그 버전·그 시점에 한정 |
 
 "미확인" 은 "지원 안 함" 이 아니다. 검색 0건도 미지원 증명이 아니다.
@@ -28,7 +29,7 @@
 | PreToolUse | 〃 | `hookSpecificOutput.additionalContext` | 지원 | [문서-ref], [설치판] 200 | **금지** |
 | PostToolUse | JSON(`tool_name`, `tool_input`, `tool_response` …) | 중립 반환 `{}` | 지원 | [문서-ref] | **사용 — 유일한 반환값** |
 | PostToolUse | 〃 | `additionalContext`, `decision` | 지원 | [문서-ref] | **금지** |
-| PostToolUse | 〃 | `updatedToolOutput` | **미확인** — Agent SDK 문서는 "any tool in both SDKs", hooks 레퍼런스 Decision control 표에는 없음. 문서 간 불일치 | [문서-sdk], [설치판] 38 | **금지.** 실측 fixture 작성만 허용 |
+| PostToolUse | 〃 | `updatedToolOutput` | **미확인** — 트랙 A 조회: Agent SDK 문서는 "any tool in both SDKs", hooks 레퍼런스 Decision control 표에는 없음. 트랙 B 조회: hooks 레퍼런스가 PostToolUse `updatedToolOutput` 을 기술한다. **트랙 간 문서 판독 불일치 → 재조회 필요.** 설치판 동작은 어느 쪽도 미검증 | [문서-sdk], [문서-B], [설치판] 38 | **금지.** 실측 fixture 작성만 허용 |
 | PostToolUse (Bash) | `tool_response` 키 | `interrupted`, `isImage`, `noOutputExpected`, `stderr`, `stdout` — **종료 코드 필드 없음** | [실측] G3 shadow 101건(`docs/evidence/ztc-phase1-20260924-opus55/g3_01_hook_events_summary.txt`) | 클라이언트는 종료 코드를 `null` 로 기록 |
 | PostToolUseFailure | JSON | 이벤트 존재 | 지원 | [문서-guide](09-24 검증 세션 조회), [설치판] 51 | Phase 1 미등록 |
 | PostToolUseFailure | 〃 | `additionalContext` | **미확인** (레퍼런스 표에 없음) | — | 금지 |
@@ -41,7 +42,7 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | `timeout` 단위 | 초 | [문서-ref] |
-| 기본값 | 600 s (command/http/mcp_tool) | [문서-ref] |
+| 기본값 | 600 s (command/http/mcp_tool) | [문서-ref]. 트랙 B 는 PreToolUse 기본을 30 s 로 기재([문서-B]) — **불일치, 재조회 필요.** 머지본 설정은 기본값에 의존하지 않고 `timeout` 을 명시한다 |
 | command/http/mcp_tool 훅 타임아웃 시 | 도구 호출을 막지 않는다. 정상 권한 흐름이 계속된다 | [문서-ref] "A timed-out `command`, `http`, or `mcp_tool` hook doesn't block the tool call…" |
 | Agent SDK 콜백 훅 타임아웃 시 | 도구 호출을 막는다 | [문서-ref] 같은 절. **CLI command 훅에는 해당 없음** |
 | 30 ms 예산 | 하네스가 아니라 **훅 클라이언트가 자체 강제**한다 | 설계(계획 §4) |
@@ -53,17 +54,22 @@
 | `.codex/hooks.json` 로딩 | **미확인** (문자열 `hooks.json` 7건 존재만) | [설치판] | 대상 아님 |
 | PreToolUse / PostToolUse 이벤트 | **미확인** (문자열 56 / 51) | [설치판] | 대상 아님 |
 | `hookSpecificOutput`·`permissionDecision`·`additionalContext`·`updatedInput` 반환 의미 | **미확인** (문자열 8 / 13 / 31 / 7) | [설치판] | 대상 아님 |
-| 현 저장소 등록 | `py c:/Pi/scripts/tier2-gate-hook.py` (Windows 경로) | [코드] `.codex/hooks.json:9` | M1 (G1) |
+| 문서상 계약 | stdin: 공통 필드(`session_id`·`cwd`·`transcript_path`·`model`) + `hook_event_name`·`tool_name`·`tool_input`·`tool_use_id`(Post 는 `tool_response` 추가). 중립 `{}`+exit 0 이면 정상 권한 흐름. `timeout` 초, 기본 600. exit 2+stderr 사유는 차단. Post 는 결과 피드백·교체 동작이 문서화돼 있으나 Phase 1 미사용 | [문서-B] | 대상 아님. 실행 여부는 여전히 **미확인** |
+| Codex 가 `CLAUDE_PROJECT_DIR` 를 설정하는지 | **미확인** — 머지본 Codex 명령은 이 변수에 의존하지 않고 git 루트로 경로를 찾는다 | [코드] | — |
+| 현 저장소 등록 (머지본) | `sh "$(git rev-parse --show-toplevel 2>/dev/null \|\| pwd)/scripts/hooks/tier2-gate.sh" \|\| py c:/Pi/scripts/tier2-gate-hook.py` | [코드] `.codex/hooks.json:9` | M1 (G1). Codex 실행 미검증 |
 
 ### 1.4 Antigravity
 | 항목 | 지원 | 근거 | Phase 1 |
 |---|---|---|---|
-| 훅 규격 전체 | **미확인** | 09-24 검증: app.asar·`~/.antigravity-ide` js 에 PreToolUse 0건. 이 세션은 앱 번들을 찾지 못함 | 대상 아님 |
+| 설치판 규격 | **미확인** | 09-24 검증: app.asar·`~/.antigravity-ide` js 에 PreToolUse 0건. 이 세션은 앱 번들을 찾지 못함 | 대상 아님 |
+| 문서상 PreToolUse | camelCase JSON(`toolCall.name`·`toolCall.args`·`stepIdx`, 공통 `conversationId`·`workspacePaths`·`transcriptPath`·`modelName`). **중립 `{}` 계약이 문서에 없고 `decision` 필수** | [문서-B] | **등록 금지** — `{}` shadow 와 동등하지 않다 |
+| 문서상 PostToolUse | `toolCall`·`stepIdx`·선택 `error` + 공통 필드. `{}` 가 문서화된 응답 | [문서-B] | 대상 아님. 설치판 fixture 전 의존 금지 |
+| 문서상 timeout | 정수 초, 기본 30. 종료 코드 동작은 문서에 없음 | [문서-B] | — |
 
 ### 1.5 저장소에 이미 등록된 훅 (현 상태, [코드])
 | 파일:줄 | 이벤트 | 명령 | Mac 에서의 실제 동작 |
 |---|---|---|---|
-| `.claude/settings.json:99-110` | PreToolUse `PowerShell\|Bash` | `py c:/Pi/scripts/tier2-gate-hook.py` | `py` 부재 → exit 127, non-blocking error → **보안 게이트가 조용히 통과** ([실측] 09-24 검증 세션 transcript 46건. 이 세션 재현은 G1 테스트 계획에 포함) |
+| `.claude/settings.json:99-110` | PreToolUse `PowerShell\|Bash` | 머지 전: `py c:/Pi/scripts/tier2-gate-hook.py` → Mac 에서 `py` 부재 exit 127 로 **보안 게이트가 조용히 통과**([실측] 09-24 transcript 46건). 머지본: `sh "$CLAUDE_PROJECT_DIR/scripts/hooks/tier2-gate.sh" \|\| py c:/Pi/...` — 고장 시 명시적 `ask` | 머지본은 G1 옵션 A. 두 트랙 모두 Mac 실기 ask 확인([실측] `docs/evidence/ztc-phase1-20260924-opus55/g1_03_live_gate_in_session.txt`, `docs/evidence/ztc-phase1-20260924-luna/w4-g1-validation.md`) |
 | `.claude/settings.json:112-123` | Stop | `py c:/Pi/scripts/remote-relay.py --summary --dry-run --hook-stdin` | 같은 이유로 미실행 추정(미측정) |
 | `.claude/settings.json:124-135` | Notification | `py c:/Pi/scripts/remote-relay.py --gate --dry-run --hook-stdin` | 〃 |
 | `.codex/hooks.json:4-15` | PreToolUse | `py c:/Pi/scripts/tier2-gate-hook.py` | Codex 가 이 파일을 실행하는지부터 미확인 |
@@ -96,18 +102,28 @@
 | 항목 | 확인 방법 | 시점 |
 |---|---|---|
 | PostToolUse Bash `tool_response` 필드 | G3 등록 후 첫 표본(마스킹 후 키 이름만 기록) | W3 |
-| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | G3 후 의도적 `false` 실행 1회 | W3 |
+| 실패 이벤트 경로(PostToolUse vs PostToolUseFailure) | 트랙 A G3 실측: 실패한 Bash 는 PostToolUse 미발화. PostToolUseFailure 등록 후 페이로드 1회 실측 | **유저 결정 대기** (등록 여부) |
 | `updatedToolOutput` CLI 지원 | 격리 fixture 세션에서만. 공유 settings 에 넣지 않는다 | Phase 2 전 |
 | Codex hooks.json 실행 | Codex 세션에서 무해 훅(파일 1행 기록) 실측 | Phase 2 이후, 별도 승인 |
-| Antigravity | 규격 문서 확보 후 | 미정 |
+| Antigravity | [문서-B] 확보됨. 설치판 fixture 후 | 미정 |
+| 트랙 간 문서 판독 불일치 2건(PreToolUse 기본 timeout, `updatedToolOutput` 기재 여부) | hooks 레퍼런스 재조회 1회, 인용문을 증거 폴더에 저장 | Phase 2 전 |
 
-## 6. 운영 절차 — 자동 비활성·복귀·원복 (트랙 A 구현 기준)
+## 6. 운영 절차 — 자동 비활성·복귀·원복 (머지본 기준)
 | 상황 | 동작 | 사람이 할 일 |
 |---|---|---|
-| 데몬 부재·타임아웃·403·503·잘못된 입력 | 클라이언트가 즉시 `{}`, `hook_events.jsonl` 에 outcome 1행 | 없음 |
-| 최근 50 호출 중 실패·예산 초과 > 20% (표본 ≥ 20) | `$PI_ROUTER_HOME/disabled` 표지 생성, 이후 데몬 호출 없이 `{}` + outcome `disabled` 기록 | 아래 복귀 절차 |
-| 복귀 | 자동 복귀 없음 | ① `hook_events.jsonl` 에서 실패 outcome 분포 확인 ② 원인 조치(데몬 기동 등) ③ `disabled` 와 `client_window.json` 삭제 ④ `scripts/bench/hook_bench.py` 1회 재측정 ⑤ 결과를 council entry 에 기록 |
-| 원복(훅 제거) | settings 의 router-client 항목 1개 삭제 → 즉시 무효 | 데몬 종료(`kill <pid>`), 원자료 보존 여부 결정 |
-| 원복(코드) | 트랙 브랜치 커밋 되돌리기. main 에는 D6 전까지 반영되지 않음 | — |
+| 데몬 부재·타임아웃·403·503·잘못된 입력·적대적 응답 | 클라이언트가 즉시 `{}`, `hook_events.jsonl` 에 outcome 1행 | 없음 |
+| 데몬 동시 처리 상한(16) 초과 | 데몬이 스레드를 만들지 않고 즉시 503 → 클라이언트 `{}` | 없음. `/telemetry` 의 `rejected_503` 로 관찰 |
+| 최근 50 호출 중 실패·예산 초과 > 20% (표본 ≥ 20) | `$PI_ROUTER_HOME/disabled` 표지 생성, 이후 데몬 호출 없이 `{}` + outcome `disabled` | 원인 확인(아래) |
+| 자동 복귀 (머지본에서 추가) | 표지가 60초 이상 지나면 다음 호출 1회가 시험 호출. 예산 안 `ok` 면 표지·창 삭제(`auto_reenabled`), 아니면 표지 시각만 갱신(`reenable_probe`) | 반복되면 `hook_events.jsonl` 의 실패 분포 확인 후 원인 조치. 표지 수동 삭제도 계속 유효 |
+| 취소 전파 | 데몬 `POST /v1/cancel {"request_id"}` 가 그 요청으로 큐에 들어간 판정 작업을 제거. 현 클라이언트는 호출하지 않는다(취소는 프로세스 종료로 끝남, 큐 TTL 30 s) | — |
+| 원자료 안전 | `PI_ROUTER_HOME` 이 저장소 안이면 쓰기 거부. 레코드 8 KiB·파일 5 MiB 초과분은 버림. symlink 스트림 거부 | 5 MiB 도달 시 보존 절차(EVAL §0.1)대로 정리 |
+| 원복(훅 제거) | settings 의 router-client 항목 삭제 → 즉시 무효. **머지본 main 에는 등록돼 있지 않다**(D4 결정) | 데몬 종료(`kill <pid>`), 원자료 보존 여부 결정 |
 
-코드 위치: 클라이언트 `scripts/hooks/router-client.sh` + `router_client.py`(상수 `WINDOW=50`, `MIN_SAMPLES=20`, `DISABLE_RATE=0.2`, `BUDGET_MS=30`), 데몬 `scripts/hybrid-router-daemon.py`, LaunchAgent 템플릿 `config/launchd/com.pi.router-daemon.plist.template`(등록 안 함).
+코드 위치: 클라이언트 `scripts/hooks/router-client.sh` + `router_client.py`(상수 `WINDOW=50`, `MIN_SAMPLES=20`, `DISABLE_RATE=0.2`, `BUDGET_MS=30`, `REENABLE_AFTER_SEC=60`), 데몬 `scripts/hybrid-router-daemon.py`(`MAX_CONCURRENT_REQUESTS=16`), 원자료 `engines/hybrid_router/ztc/telemetry.py`·`paths.py`, LaunchAgent 템플릿 `config/launchd/com.pi.router-daemon.plist.template`(등록 안 함).
+
+## 7. 공식 문서 참조 ([문서-B], 트랙 B 조회 2026-09-24)
+- Claude Code Hooks reference — https://code.claude.com/docs/en/hooks
+- OpenAI Codex Hooks reference — https://developers.openai.com/codex/hooks
+- Google Antigravity Hooks — https://antigravity.google/docs/hooks?tab=ide
+
+설치된 버전 문자열은 바이너리를 식별할 뿐 훅 동작을 보증하지 않는다.

@@ -1,6 +1,6 @@
 # PLAN — Pi 토폴로지 ZTC 고도화 · 추측 실행 체계 구축 (실행 계획 v0.3)
 
-- Status: **DRAFT v0.3 — 아스트라 2차 검토·A1~A12·M1~M6 반영, 유저 승인(G0) 대기.** 병렬 초안 모드 트랙 A(Opus 5.5) 초안이며, 트랙 B 초안과 머지 규약(`tasks/ztc-phase1-dual-draft__merge-protocol.md`)으로 합쳐진다.
+- Status: **v0.3 머지본 (D5, 2026-09-24)** — 아스트라 2차 검토·A1~A12·M1~M6 반영. v0.3 문서 세트는 두 트랙 G0 에서 유저 승인. 트랙 A(Opus 5.5) 초안을 기반으로 삼았고, 트랙 B(Luna) 초안의 계약표 행·K0·보존 절차는 `docs/harness/` 두 문서에 접목했다. 비교와 머지안: `docs/evidence/ztc-phase1-merge-20260924/comparison.md`. main 반영(D6)은 유저 승인 대기.
 - 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro. v0.1 2026-09-23 → v0.2 2026-09-24 → v0.3 2026-09-24 Claude Code (Opus 5.5, worktree `~/Pi-wt/ztc-opus55`)
 - v0.3 신규 정본 문서: 훅 계약표 `docs/harness/HOOK_CONTRACT_ztc.md`, 평가 규약 `docs/harness/EVAL_PROTOCOL_ztc.md`. 이 계획과 두 문서가 다르면 두 문서가 세부 정본이다.
 - v0.3 추가 근거: `docs/evidence/ztc-plan-review-20260924/astra-review-2.md`, `claude-code-verification-A1-A12.md`(2차 회신 절)
