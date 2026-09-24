@@ -37,7 +37,7 @@ from ztc import telemetry  # noqa: E402
 from ztc.masking import mask_cwd, mask_text  # noqa: E402
 from ztc.paths import BIND_HOST, disabled_marker, private_dir, router_home, router_port  # noqa: E402
 
-CLIENT_VERSION = "opus55-0.1"
+CLIENT_VERSION = "ztc-phase1-0.1"
 BUDGET_MS = 30.0
 MAX_STDIN = 64 * 1024
 MAX_RESPONSE = 16 * 1024

@@ -71,8 +71,8 @@ class TestMasking(unittest.TestCase):
         self.assertIn("<ABS>/token.txt", out.replace("\\", "/"))
 
     def test_cwd_and_filename_and_stderr(self):
-        self.assertNotIn(HOME, mask_cwd(f"{HOME}/Pi-wt/ztc-opus55"))
-        self.assertEqual(mask_cwd(f"{HOME}/Pi-wt/ztc-opus55"), "~/Pi-wt/ztc-opus55")
+        self.assertNotIn(HOME, mask_cwd(f"{HOME}/projects/sample-repo"))
+        self.assertEqual(mask_cwd(f"{HOME}/projects/sample-repo"), "~/projects/sample-repo")
         stderr = f"Traceback:\n  File \"{HOME}/proj/app.py\", line 3\nKeyError: 'API_KEY=zzzsecretzzz'"
         out = mask_text(stderr)
         self.assertNotIn("zzzsecretzzz", out)
