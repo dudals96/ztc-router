@@ -14,7 +14,7 @@ import argparse
 from urllib.request import Request, urlopen
 from pathlib import Path
 from urllib.error import URLError
-from router_data_safety import append_bounded_jsonl, resolve_router_home
+from router_data_safety import append_bounded_jsonl, mask_text, prepare_error_input, resolve_router_home
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
@@ -34,13 +34,14 @@ def query_status():
 
 
 def dispatch_task(task_type: str, content: str, categories_str: str = "", latency_strict: int = 100):
+    prepared = prepare_error_input({"stderr": content})
     payload = {
-        "task_type": task_type,
-        "content": {"text": content},
+        "task_type": mask_text(task_type)[:128],
+        "content": {"text": prepared["masked_text"]},
         "latency_strict": latency_strict
     }
     if categories_str:
-        payload["categories"] = [c.strip() for c in categories_str.split(",") if c.strip()]
+        payload["categories"] = [mask_text(c.strip())[:128] for c in categories_str.split(",") if c.strip()]
         
     try:
         req = Request(

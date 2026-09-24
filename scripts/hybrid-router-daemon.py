@@ -11,27 +11,38 @@ import os
 import sys
 import json
 import time
-import subprocess
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from threading import Thread
+import threading
+import signal
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 from pathlib import Path
 from router_data_safety import resolve_router_home
+from router_daemon_runtime import ShadowEventQueue
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PI_ROUTER_HOME = resolve_router_home(REPO_ROOT)
 sys.path.insert(0, str(REPO_ROOT / "engines" / "hybrid_router"))
 from router_core import HybridDecisionRouter
 
-TAILNET_NODES = {
-    "SYSTEM-1 (MacBook Pro)": "100.74.61.51",
-    "SYSTEM-2 (desktop-1q6j3e6)": "100.101.16.70",
-    "SYSTEM-3 (nv-gigabyte)": "100.75.98.124",
-    "SYSTEM-4 (richardkim-i7)": "100.90.58.94"
-}
+ROUTER_HOST = "127.0.0.1"
+MAX_BODY_BYTES = 64 * 1024
+MAX_ACTIVE_REQUESTS = 4
 
-ROUTER_PORT = 9876
+
+def resolve_router_port() -> int:
+    try:
+        port = int(os.environ.get("PI_ROUTER_PORT", "9876"))
+    except ValueError as exc:
+        raise RuntimeError("PI_ROUTER_PORT must be an integer") from exc
+    if not 1024 <= port <= 65535:
+        raise RuntimeError("PI_ROUTER_PORT must be between 1024 and 65535")
+    return port
+
+
+ROUTER_PORT = resolve_router_port()
 router_instance = None
+SHADOW_QUEUE = ShadowEventQueue(PI_ROUTER_HOME / "interventions.jsonl", REPO_ROOT)
 
 
 def load_telemetry_data(log_path):
@@ -68,63 +79,50 @@ def load_telemetry_data(log_path):
     }
 
 
-def run_echo_ping_verification():
-    print("\n========================================================")
-    print("  TAILNET DISTRIBUTED ECHO PING VERIFICATION (4 NODES)")
-    print("========================================================")
-    all_ok = True
-    for node_name, ip in TAILNET_NODES.items():
-        t0 = time.perf_counter()
-        if ip == "100.74.61.51":
-            # Local loopback on System 1
-            print(f"[*] {node_name} [{ip}]: REACHABLE (Local Loopback, < 0.1ms)")
-            continue
-            
-        try:
-            res = subprocess.run(
-                ["ping", "-c", "1", "-W", "1500", ip],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=3
-            )
-            rtt = round((time.perf_counter() - t0) * 1000, 2)
-            if res.returncode == 0:
-                print(f"[✓] {node_name} [{ip}]: ECHO PING SUCCESS (RTT: {rtt}ms)")
-            else:
-                print(f"[!] {node_name} [{ip}]: PING TIMEOUT / UNREACHABLE")
-                all_ok = False
-        except Exception as e:
-            print(f"[!] {node_name} [{ip}]: PING FAILED ({e})")
-            all_ok = False
-            
-    print("========================================================\n")
-    return all_ok
-
-
 class RouterHTTPHandler(BaseHTTPRequestHandler):
+    def _send_json(self, status_code: int, payload: dict[str, Any]) -> None:
+        encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _read_payload(self) -> tuple[object | None, tuple[int, str] | None]:
+        raw_length = self.headers.get("Content-Length")
+        if raw_length is None or not raw_length.isdecimal():
+            return None, (400, "invalid request")
+        content_length = int(raw_length)
+        if content_length > MAX_BODY_BYTES:
+            return None, (413, "request too large")
+        body = self.rfile.read(content_length)
+        if len(body) != content_length:
+            return None, (400, "invalid request")
+        try:
+            return json.loads(body.decode("utf-8")), None
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None, (400, "invalid request")
+
     def do_GET(self):
         if self.path == "/health" or self.path == "/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
+            queue_status = SHADOW_QUEUE.status()
+            ready = router_instance is not None and queue_status["ready"] and not queue_status["write_error_count"]
             status_payload = {
-                "status": "ready",
+                "status": "ready" if ready else "degraded",
                 "signal": "Keyword heuristic router ready",
                 "daemon": "HYBRID-ROUTER",
-                "port": ROUTER_PORT,
-                "timestamp": time.time()
+                "port": self.server.server_port,
+                "timestamp": time.time(),
+                "router_ready": router_instance is not None,
+                "shadow_queue": queue_status,
             }
-            self.wfile.write(json.dumps(status_payload).encode("utf-8"))
+            self._send_json(200 if ready else 503, status_payload)
 
         elif self.path == "/telemetry":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            
             log_path = PI_ROUTER_HOME / "interventions.jsonl"
             telemetry_data = load_telemetry_data(log_path)
-            self.wfile.write(json.dumps(telemetry_data).encode("utf-8"))
+            self._send_json(200, telemetry_data)
 
         elif self.path == "/dashboard" or self.path == "/":
             self.send_response(200)
@@ -218,7 +216,7 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
       </div>
       <div class="badge">
         <span class="dot"></span>
-        <span>DAEMON READY : PORT 9876</span>
+        <span>DAEMON READY : PORT __ROUTER_PORT__</span>
       </div>
     </header>
 
@@ -303,32 +301,69 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
     setInterval(refreshData, 3000);
   </script>
 </body>
-</html>"""
+</html>""".replace("__ROUTER_PORT__", str(ROUTER_PORT))
             self.wfile.write(html_content.encode("utf-8"))
 
         else:
-            self.send_response(404)
-            self.end_headers()
+            self._send_json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path == "/route" or self.path == "/dispatch":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+        payload, error = self._read_payload()
+        if error:
+            self._send_json(error[0], {"error": error[1]})
+            return
+
+        if self.path == "/shadow":
             try:
-                task = json.loads(body.decode("utf-8"))
-                result = router_instance.dispatch(task)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(result).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                accepted, result = SHADOW_QUEUE.enqueue(payload)
+            except ValueError:
+                self._send_json(400, {"error": "invalid request"})
+                return
+            status_code = 202 if accepted else (409 if result == "cancelled" else 503)
+            self._send_json(status_code, {"accepted": accepted, "status": result})
+        elif self.path == "/cancel":
+            if not isinstance(payload, dict) or set(payload) != {"requestId"}:
+                self._send_json(400, {"error": "invalid request"})
+                return
+            cancelled = SHADOW_QUEUE.cancel(payload.get("requestId"))
+            self._send_json(202 if cancelled else 400, {"cancelled": cancelled})
+        elif self.path == "/route" or self.path == "/dispatch":
+            if not isinstance(payload, dict) or set(payload) - {"task_type", "content", "categories", "tokens_count", "latency_strict", "instructions"}:
+                self._send_json(400, {"error": "invalid request"})
+                return
+            content = payload.get("content", {})
+            categories = payload.get("categories", [])
+            task_type = payload.get("task_type", "general")
+            if (
+                not isinstance(task_type, str)
+                or len(task_type) > 128
+                or not isinstance(content, dict)
+                or len(content) > 32
+                or any(not isinstance(key, str) or len(key) > 128 for key in content)
+                or any(not isinstance(value, (str, int, float, bool, type(None))) for value in content.values())
+                or len(json.dumps(content).encode("utf-8")) > MAX_BODY_BYTES // 2
+                or not isinstance(categories, list)
+                or len(categories) > 100
+                or any(not isinstance(item, str) or len(item) > 128 for item in categories)
+                or any(
+                    isinstance(payload.get(key), bool)
+                    or not isinstance(payload.get(key), int)
+                    or not 0 <= payload[key] <= 600000
+                    for key in ("tokens_count", "latency_strict")
+                    if key in payload
+                )
+                or ("instructions" in payload and (not isinstance(payload["instructions"], str) or len(payload["instructions"]) > 1024))
+                or router_instance is None
+            ):
+                self._send_json(400, {"error": "invalid request"})
+                return
+            try:
+                result = router_instance.dispatch(payload)
+                self._send_json(200, result)
+            except Exception:
+                self._send_json(500, {"error": "dispatch failed"})
         else:
-            self.send_response(404)
-            self.end_headers()
+            self._send_json(404, {"error": "not found"})
 
     def log_message(self, format, *args):
         # Quiet standard HTTP logs
@@ -337,29 +372,56 @@ class RouterHTTPHandler(BaseHTTPRequestHandler):
 
 def start_daemon():
     global router_instance
-    print("[INIT] Initializing Hybrid Decision Router Core...")
     router_instance = HybridDecisionRouter()
-    
-    # 1. Run Pre-Flight Echo Ping
-    run_echo_ping_verification()
-    
-    # 2. Warm up local routing paths
-    warmup_task = {"task_type": "build_error_branching", "content": {"log": "init warmup"}}
-    warmup_res = router_instance.dispatch(warmup_task)
-    print(f"[WARMUP] Local Engine Warmup Completed. Latency: {warmup_res['total_pipeline_latency_ms']}ms")
+    server = BoundedThreadingHTTPServer((ROUTER_HOST, ROUTER_PORT), RouterHTTPHandler)
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+    try:
+        SHADOW_QUEUE.start()
+        if not SHADOW_QUEUE.status()["ready"]:
+            raise RuntimeError("shadow event queue did not become ready")
+        print(f"Keyword heuristic router listening on http://{ROUTER_HOST}:{ROUTER_PORT}")
+        server.serve_forever(poll_interval=0.05)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        stopped = SHADOW_QUEUE.stop()
+        if not stopped:
+            print("Shadow event queue did not stop cleanly", file=sys.stderr)
 
-    # 3. Emit the required readiness signal
-    print("\n" + "="*70)
-    print(">>> [SIGNAL] Keyword heuristic router ready <<<")
-    print("======================================================================")
-    print(f"[*] Background Listener active on http://127.0.0.1:{ROUTER_PORT}")
-    print(f"[*] Serving Anti-Gravity Sidebar Extension & CLI Clients")
-    print("[*] Mode: local keyword heuristics and keyword-match simulation")
-    print("======================================================================\n")
 
-    # 4. Start HTTP Server (bind 0.0.0.0 to allow Tailnet peers access)
-    server = HTTPServer(("0.0.0.0", ROUTER_PORT), RouterHTTPHandler)
-    server.serve_forever()
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    request_queue_size = 8
+    daemon_threads = True
+
+    def __init__(self, server_address, handler_class):
+        self.request_slots = threading.BoundedSemaphore(MAX_ACTIVE_REQUESTS)
+        super().__init__(server_address, handler_class)
+
+    def process_request(self, request, client_address):
+        if not self.request_slots.acquire(blocking=False):
+            try:
+                request.settimeout(0.1)
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self.request_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.request_slots.release()
+
+
+def _handle_sigterm(_signum, _frame):
+    raise KeyboardInterrupt
 
 
 if __name__ == "__main__":
