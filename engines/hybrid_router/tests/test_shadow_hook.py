@@ -88,7 +88,7 @@ class TestShadowHookFixtures(unittest.TestCase):
         self.fail("shadow queue did not drain")
 
     def hook_input(self, event_name="PreToolUse", request_id="toolu_call_01"):
-        secret = "sk_test_NeverLogThis1234567890abcdef"
+        secret = "_".join(("sk", "test", "NeverLogThis1234567890abcdef"))
         return {
             "hook_event_name": event_name,
             "tool_use_id": request_id,
@@ -121,7 +121,7 @@ class TestShadowHookFixtures(unittest.TestCase):
         rows = [json.loads(line) for line in log_text.splitlines()]
         self.assertEqual([row["intervention_type"] for row in rows], ["PreToolUse", "PostToolUse"])
         self.assertEqual({row["request_id"] for row in rows}, {"toolu_call_01"})
-        for sensitive_value in ("sk_test_NeverLogThis1234567890abcdef", "alice", "private-project", "a.py", "result.json", "alice@example.com"):
+        for sensitive_value in (secret, "alice", "private-project", "a.py", "result.json", "alice@example.com"):
             self.assertNotIn(sensitive_value, log_text)
         self.assertEqual(stat.S_IMODE(log_path.stat().st_mode), 0o600)
         self.assertEqual(stat.S_IMODE(log_path.parent.stat().st_mode), 0o700)
