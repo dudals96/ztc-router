@@ -1,0 +1,104 @@
+{
+ "opus55": {
+  "PreToolUse_c1": {
+   "n": 200,
+   "conc": 1,
+   "p50": 27.6,
+   "p95": 28.7,
+   "p99": 31.2,
+   "max": 34.6,
+   "non_neutral": 0
+  },
+  "PreToolUse_c3": {
+   "n": 201,
+   "conc": 3,
+   "p50": 31.0,
+   "p95": 33.3,
+   "p99": 37.4,
+   "max": 39.5,
+   "non_neutral": 0
+  },
+  "PostToolUse_c1": {
+   "n": 200,
+   "conc": 1,
+   "p50": 27.6,
+   "p95": 28.8,
+   "p99": 30.9,
+   "max": 32.8,
+   "non_neutral": 0
+  },
+  "PostToolUse_c3": {
+   "n": 201,
+   "conc": 3,
+   "p50": 31.4,
+   "p95": 32.7,
+   "p99": 34.4,
+   "max": 37.2,
+   "non_neutral": 0
+  },
+  "health": "{\"status\": \"ready\", \"ledger\": true, \"judge_worker\": true, \"queue_depth\": 0}",
+  "absent_pre": {
+   "n": 50,
+   "conc": 1,
+   "p50": 25.9,
+   "p95": 27.6,
+   "p99": 43.7,
+   "max": 43.7,
+   "non_neutral": 0
+  }
+ },
+ "luna": {
+  "PreToolUse_c1": {
+   "n": 200,
+   "conc": 1,
+   "p50": 51.7,
+   "p95": 53.8,
+   "p99": 55.7,
+   "max": 59.4,
+   "non_neutral": 0
+  },
+  "PreToolUse_c3": {
+   "n": 201,
+   "conc": 3,
+   "p50": 56.3,
+   "p95": 59.5,
+   "p99": 66.2,
+   "max": 66.5,
+   "non_neutral": 0
+  },
+  "PostToolUse_c1": {
+   "n": 200,
+   "conc": 1,
+   "p50": 52.3,
+   "p95": 54.3,
+   "p99": 60.5,
+   "max": 68.3,
+   "non_neutral": 0
+  },
+  "PostToolUse_c3": {
+   "n": 201,
+   "conc": 3,
+   "p50": 56.2,
+   "p95": 58.0,
+   "p99": 70.5,
+   "max": 70.9,
+   "non_neutral": 0
+  },
+  "health": "{\"status\":\"ready\",\"signal\":\"Keyword heuristic router ready\",\"daemon\":\"HYBRID-ROUTER\",\"port\":9878,\"timestamp\":1790258397.162913,\"router_ready\":true,\"shadow_queue\":{\"ready\":true,\"queue_depth\":0,\"queue_limit\":64,\"dropped_count\":0,\"write_error_count\":0,\"processed_count\":822}}",
+  "absent_pre": {
+   "n": 50,
+   "conc": 1,
+   "p50": 52.5,
+   "p95": 54.9,
+   "p99": 56.7,
+   "max": 56.7,
+   "non_neutral": 0
+  }
+ },
+ "_meta": {
+  "date": "2026-09-24",
+  "host": "richardkim-macpro-macbookpro (Mac, Python 3.14, node 24.18)",
+  "method": "각 트랙 동결 커밋(A 3a14fe4, B 2e43c35)의 .claude/settings.json 에 등록된 shadow 훅 명령을 /bin/sh -c 로 그대로 실행. 호출마다 고유 tool_use_id. 트랙 순차(동시 벤치 없음). 데몬 가동 구간 먼저, 데몬 부재 구간 마지막. HOME 은 임시 폴더. 값은 ms, 하네스 밖 프로세스 전체 벽시계.",
+  "invalidated_first_run": "1차 측정은 부재 구간을 먼저 돌려 트랙 A 클라이언트가 자동 비활성(20/20 실패) 후 복귀하지 않아 A 값이 무효. 재측정본만 기록."
+ }
+}
