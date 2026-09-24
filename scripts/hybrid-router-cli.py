@@ -14,9 +14,11 @@ import argparse
 from urllib.request import Request, urlopen
 from pathlib import Path
 from urllib.error import URLError
+from router_data_safety import append_bounded_jsonl, resolve_router_home
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
-PI_ROUTER_HOME = Path(os.environ.get("PI_ROUTER_HOME", Path.home() / ".pi-router" / "luna")).expanduser()
+PI_ROUTER_HOME = resolve_router_home(REPO_ROOT)
 LOG_PATH = PI_ROUTER_HOME / "interventions.jsonl"
 
 
@@ -98,7 +100,7 @@ def display_savings_hud():
     else:
         for idx, ev in enumerate(recent_events[-5:], 1):
             ts = ev.get("timestamp", "").split("T")[-1][:8]
-            desc = ev.get("description", "")
+            desc = ev.get("error_class", ev.get("intervention_type", "분류 이벤트"))
             latency = ev.get("latency_ms") if ev.get("latency_kind") == "measured_wall_clock" else None
             latency_label = f"{latency:.2f}ms" if isinstance(latency, (int, float)) else "미측정"
             print(f" │ [{idx}] {ts} | 절감 미측정 | {latency_label} | {desc[:48]}")
@@ -127,10 +129,7 @@ def check_milestone_trigger(stage: int, total_stages: int, force: bool = False):
             "agent_state": "manual_milestone_telemetry_rendered",
             "progress_percentage": progress_pct
         }
-        LOG_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        descriptor = os.open(LOG_PATH, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(descriptor, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        append_bounded_jsonl(LOG_PATH, entry, REPO_ROOT)
             
         print(" [✓] 75% 마일스톤 가시화 출력 및 감사 로그 기록 완료.\n")
     else:

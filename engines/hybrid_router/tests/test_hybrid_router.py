@@ -20,6 +20,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
 from hierarchical_routing.hierarchical_engine import LayaHierarchicalEngine
 from gateway.jev_client import JevGatewayClient, CircuitBreakerState
 from router_core import HybridDecisionRouter

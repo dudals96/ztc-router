@@ -10,32 +10,24 @@ Logs detailed intervention events to the configured router data directory.
 """
 
 import os
-import sys
 import re
 import json
 import time
 import argparse
 from typing import Dict, Any, Optional
-from urllib.request import Request, urlopen
 from pathlib import Path
-from urllib.error import URLError
+from router_data_safety import append_bounded_jsonl, classify_error, prepare_error_input, resolve_router_home
 
-REPO_ROOT = os.environ.get("PI_REPO_ROOT", str(Path(__file__).resolve().parent.parent))
-RULES_CONFIG_PATH = os.path.join(REPO_ROOT, "config", "anti_pattern_rules.json")
-PI_ROUTER_HOME = Path(os.environ.get("PI_ROUTER_HOME", Path.home() / ".pi-router" / "luna")).expanduser()
+REPO_ROOT = Path(os.environ.get("PI_REPO_ROOT", Path(__file__).resolve().parent.parent)).resolve()
+RULES_CONFIG_PATH = REPO_ROOT / "config" / "anti_pattern_rules.json"
+PI_ROUTER_HOME = resolve_router_home(REPO_ROOT)
 LOG_PATH = PI_ROUTER_HOME / "interventions.jsonl"
-ROUTER_URL = os.environ.get("ROUTER_URL", "http://127.0.0.1:9876")
-
-# Fallback local import if daemon is unreachable
-sys.path.insert(0, os.path.join(REPO_ROOT, "engines", "hybrid_router"))
-from hierarchical_routing.hierarchical_engine import LayaHierarchicalEngine
 
 
 class DecisionGateInterceptor:
     def __init__(self, config_path: str = RULES_CONFIG_PATH):
         self.config = self._load_json(config_path)
         self.rules = self.config.get("rules", {})
-        self.laya_fallback = LayaHierarchicalEngine()
 
     def _load_json(self, path: str) -> Dict[str, Any]:
         if os.path.exists(path):
@@ -43,43 +35,19 @@ class DecisionGateInterceptor:
                 return json.load(f)
         return {}
 
-    def _query_laya_daemon(self, task_type: str, content: Dict[str, Any], latency_strict: int = 40) -> Dict[str, Any]:
-        """Query the running Laya daemon or fallback to local in-memory engine."""
-        payload = {
-            "task_type": task_type,
-            "content": content,
-            "latency_strict": latency_strict
-        }
-        try:
-            req = Request(
-                f"{ROUTER_URL}/dispatch",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            with urlopen(req, timeout=1.5) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except Exception:
-            return self.laya_fallback.predict(content)
-
-    def log_intervention(self, intervention_type: str, description: str, latency_ms: float, metadata: Dict[str, Any]):
-        """Append intervention event to learning/interventions.jsonl."""
+    def log_intervention(self, intervention_type: str, error_class: str, fingerprint: str, latency_ms: float):
         entry = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z") or "2026-09-22T23:15:00+09:00",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "cycle": "hybrid-router-intervention",
             "intervention_type": intervention_type,
-            "description": description,
-            "agent_state": "intervened_by_decision_engine",
+            "error_class": error_class,
+            "input_fingerprint": fingerprint,
             "tokens_saved": None,
             "savings_status": "unmeasured",
             "latency_ms": latency_ms,
-            "latency_kind": "measured_wall_clock",
-            "metadata": metadata
+            "latency_kind": "measured_wall_clock"
         }
-        log_path = Path(LOG_PATH)
-        log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(descriptor, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return append_bounded_jsonl(Path(LOG_PATH), entry, REPO_ROOT)
 
     @staticmethod
     def format_telemetry_hud(title: str, latency_ms: float, anti_pattern: str, prescription: str) -> str:
@@ -110,31 +78,23 @@ class DecisionGateInterceptor:
         is_redundant_skill = any(re.search(pat, target_file, re.I) for pat in patterns)
         if is_redundant_skill:
             t0 = time.perf_counter()
-            code_content = tool_input.get("CodeContent") or str(tool_input)
-            
-            # Query Laya decision engine
-            decision_res = self._query_laya_daemon(
-                task_type="issue_component_tagging",
-                content={"intent": "avoid redundant skill", "source": code_content[:300]}
-            )
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
-            decision_val = decision_res.get("decision", "syntax_compile")
+            decision_val = "configured_path_rule"
+            safe_input = prepare_error_input({"file_path": target_file})
 
             # Generate visual HUD card
             hud_card = self.format_telemetry_hud(
                 title="규칙 기반 스킬 생성 차단",
                 latency_ms=elapsed_ms,
                 anti_pattern=f"불필요한 스킬 파일 생성 ({os.path.basename(target_file)})",
-                prescription=f"Laya 판정 [{decision_val}] 즉시 적용"
+                prescription="설정된 경로 규칙과 일치"
             )
 
-            # Log intervention
-            desc = f"[ANTI-PATTERN BLOCKED] Redundant skill creation denied for '{os.path.basename(target_file)}'. Laya decision injected."
             self.log_intervention(
                 intervention_type="directive",
-                description=desc,
-                latency_ms=elapsed_ms,
-                metadata={"blocked_file": target_file, "decision": decision_val}
+                error_class="configured_path_rule",
+                fingerprint=str(safe_input["fingerprint"]),
+                latency_ms=elapsed_ms
             )
 
             return {
@@ -145,7 +105,7 @@ class DecisionGateInterceptor:
                 "injected_prescription": {
                     "status": "OVERRIDDEN_BY_DECISION_ENGINE",
                     "decision": decision_val,
-                    "action_required": "스킬 파일 생성을 취소하고, Laya 엔진의 판정 결과를 직접 사용하여 다음 작업을 진행하십시오.",
+                    "action_required": "설정된 경로 규칙과 일치했습니다. 작업 목적과 범위를 직접 확인하십시오.",
                     "latency_ms": elapsed_ms,
                     "latency_kind": "measured_wall_clock",
                     "tokens_saved": None,
@@ -156,7 +116,7 @@ class DecisionGateInterceptor:
 
         return {"permission": "allow"}
 
-    def intercept_post_tool_use(self, tool_name: str, command: str, exit_code: int, output_text: str) -> Optional[Dict[str, Any]]:
+    def intercept_post_tool_use(self, tool_name: str, command: str, exit_code: int, output_text: str, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """
         Classify failed-command text with local rules and return a suggested action.
         """
@@ -165,37 +125,51 @@ class DecisionGateInterceptor:
             return None
 
         t0 = time.perf_counter()
-        # Query Laya build_failure schema
-        decision_res = self._query_laya_daemon(
-            task_type="build_error_branching",
-            content={"log": output_text[-500:], "command": command}
+        error_input = dict(context or {})
+        error_input["command"] = command
+        error_input["stderr"] = output_text
+        prepared = prepare_error_input(error_input)
+        matched = classify_error(
+            str(prepared["classification_text"]),
+            error_rule.get("error_signatures", {}),
         )
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
+        if matched is None:
+            self.log_intervention("abstain", "abstain", str(prepared["fingerprint"]), elapsed_ms)
+            return {
+                "intervened": False,
+                "error_class": "abstain",
+                "decision_method": "configured_regex_l0",
+                "model_inference_performed": False,
+                "tokens_saved": None,
+                "savings_status": "unmeasured",
+                "latency_ms": elapsed_ms,
+                "latency_kind": "measured_wall_clock",
+            }
 
-        error_class = decision_res.get("decision", "syntax_compile")
-        signatures = error_rule.get("error_signatures", {}).get(error_class, {})
-        prescribed_action = signatures.get("prescribed_action", "Apply specific fix directly without architectural reasoning.")
+        error_class, prescribed_action = matched
 
         # Generate visual HUD card
         hud_card = self.format_telemetry_hud(
             title="실패 출력의 규칙 기반 분류",
             latency_ms=elapsed_ms,
-            anti_pattern=f"명령어 '{command.split()[0]}' 에러 루프 진입 징후",
+                anti_pattern=f"실패한 명령 출력과 {error_class} 규칙 일치",
             prescription=f"[{error_class}] {prescribed_action}"
         )
 
-        desc = f"[HEURISTIC CLASSIFICATION] Command '{command.split()[0]}' failed with exit code {exit_code}. Classified as '{error_class}' in {elapsed_ms}ms."
         self.log_intervention(
             intervention_type="directive",
-            description=desc,
-            latency_ms=elapsed_ms,
-            metadata={"command": command, "error_class": error_class}
+            error_class=error_class,
+            fingerprint=str(prepared["fingerprint"]),
+            latency_ms=elapsed_ms
         )
 
         return {
             "intervened": True,
             "error_class": error_class,
-            "requires_human": decision_res.get("tier2_domain", {}).get("requires_human_intervention", False),
+            "decision_method": "configured_regex_l0",
+            "model_inference_performed": False,
+            "requires_human": error_class in {"permission_auth", "out_of_memory"},
             "prescribed_action": prescribed_action,
             "visual_hud": hud_card,
             "prompt_injection": f"\n[SYSTEM DECISION ENGINE OVERRIDE]\n{hud_card}\n* 지침: 장황한 분석이나 도구 작성을 중단하고 위 처방대로 직접 조치하십시오.\n",

@@ -16,9 +16,10 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
 from pathlib import Path
+from router_data_safety import resolve_router_home
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PI_ROUTER_HOME = Path(os.environ.get("PI_ROUTER_HOME", Path.home() / ".pi-router" / "luna")).expanduser()
+PI_ROUTER_HOME = resolve_router_home(REPO_ROOT)
 sys.path.insert(0, str(REPO_ROOT / "engines" / "hybrid_router"))
 from router_core import HybridDecisionRouter
 
@@ -44,7 +45,11 @@ def load_telemetry_data(log_path):
                 try:
                     event = json.loads(line)
                     if event.get("cycle") == "hybrid-router-intervention":
-                        events.append(event)
+                        events.append({
+                            key: event[key]
+                            for key in ("timestamp", "intervention_type", "error_class", "latency_ms", "latency_kind")
+                            if key in event
+                        })
                 except (json.JSONDecodeError, TypeError):
                     continue
 
