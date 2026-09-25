@@ -1,6 +1,6 @@
 # AB_EVAL_ztc — ZTC 라우터 구현체 A/B 평가표 (초안)
 
-- Status: **초안 (2026-09-25), 유저 검토 대기.** 실제 A/B 는 Phase 2(라우터가 advisory `additionalContext` 를 주입할 수 있는 단계) 이후에 시작한다(유저 결정).
+- Status: **v0.2 (2026-09-25) — §6 U1–U9 유저 결정 반영(전부 추천안).** 실제 A/B 는 Phase 2(라우터가 advisory `additionalContext` 를 주입할 수 있는 단계) 이후에 시작한다(유저 결정). v0.1 초안 → v0.2 변경은 §6 결정표만(판정 규칙 본문은 U8·U9 반영 문장 추가).
 - 작성: Claude Code (Opus 5.5) 서브에이전트 @ richardkim-macpro-macbookpro. 이 문서는 사전 등록(pre-registration)용이다. 측정 시작 후 판정 규칙·가중치를 바꾸면 버전을 올리고 사유를 적는다(`EVAL_PROTOCOL_ztc.md:3` 과 같은 규칙).
 - 상위: `docs/PLAN_ZTC_topology_optimization.md` v0.3 §2.2·§5.4·§6, `docs/harness/EVAL_PROTOCOL_ztc.md`, `docs/harness/HOOK_CONTRACT_ztc.md`. 비교 방식 선례: `docs/evidence/ztc-phase1-merge-20260924/comparison.md`.
 
@@ -122,13 +122,15 @@
 8. **표 채우기·판정:** §3 A/B 칸을 채우고 §4 규칙 1→6 순서로 적용. 누적 쌍 표(쌍 번호·과제·쌍 결과·E2 비율)를 갱신하고 n 에 맞는 보고 문구를 고른다.
 9. **보고:** council entry `docs/turn-reports/<date>_claude-code_ab-<slug>.md` 에 요약, 오케스트레이터면 UTR 갱신(`CLAUDE.md` 종료 규칙). worktree·브랜치는 유저 결정 전 지우지 않는다.
 
-## 6. 미결 사항 (유저 결정)
-- **U1 1차 지표:** E2(추정 비용) 로 둘지, E3(벽시계) 또는 E7(유저 개입)로 둘지. 이 문서는 K7 과 맞춰 E2 로 제안.
-- **U2 쌍 수·예산:** 최소 6쌍(권장 8–10) + A/A 2–3쌍의 유료 토큰 비용 승인. 한 쌍 = 루프 2개 비용.
-- **U3 부트스트랩:** `CLAUDE.md` 0단계 `session-recover.ps1 -Pull`·핸드오프 `-Consume -Push` 는 pull/push 를 일으켜 격리와 충돌한다. 두 arm 모두 생략할지, pull 없이 읽기만 할지.
-- **U4 공유 메모리:** 루프 중 `~/.claude/projects/.../memory/` 쓰기를 금지할지, 쓰는 루프를 부적격으로 볼지.
-- **U5 텔레메트리 필드:** Phase 2 클라이언트에 `arm`·`session_id` 해시 필드를 넣을지(지금은 경로로만 구분).
-- **U6 적격 루프 목록:** 어떤 과제를 쌍의 블록으로 쓸지(Pi 로컬 전용, 외부 부작용 0). 지시문과 R2 요구사항 체크리스트를 실행 전에 함께 고정.
-- **U7 데몬·포트:** A 전용 데몬 수동 기동(승인 게이트)과 포트 번호. LaunchAgent 는 쓰지 않는다.
-- **U8 블라인드 범위:** R4·Q1 을 블라인드로 할지(권장), 유저가 arm 을 이미 알고 있는 경우 R4 가중치를 낮출지.
-- **U9 비열등 마진:** R2 −10%p, E2 ±15% 문턱이 적절한지.
+## 6. 유저 결정 (2026-09-25, 전부 추천안 채택 — `learning/user-prompts/2026-09-25_Fri/07_ab-eval-u1-u9-deck-skill.md`)
+| # | 결정 | 확정 내용 |
+|---|---|---|
+| U1 | 1차 지표 | **E2(추정 비용)** 유지. 이 계정은 구독 결제(`~/.claude.json` billingType)라 E2 는 실지출이 아니라 API 환산 비교값이다 — 사용 한도 소모의 대리 지표로 쓴다 |
+| U2 | 쌍 수·예산 | **단계 승인.** 지금(Phase 1) A/A 2쌍 = 루프 4개만 승인. 본실험 6쌍은 Phase 2 뒤 A/A 결과를 보고 다시 승인. 참고 규모: 중간 세션 1개 ≈ cache read 8–13M · cache 생성 0.3–0.4M · output 0.1–0.2M 토큰(09-23~25 Pi 세션 실측). `config/agent_limits.json` 의 일 $2 한도는 API 과금 기준이라 적용 대상 아님 |
+| U3 | 부트스트랩 | 양 arm 모두 `session-recover.ps1` 을 **`-Pull` 없이** 읽기 전용으로 실행, 핸드오프 `-Consume`·push 금지(지시문에 명시). C9 는 이 방식으로 확인 |
+| U4 | 공유 메모리 | 지시문에 `~/.claude/projects/.../memory/` **쓰기 금지** 명시, 쓰면 그 쌍 무효(S4) |
+| U5 | 텔레메트리 필드 | Phase 2 클라이언트에 `arm`(`PI_AB_ARM` 값)·`session_id` 해시 필드 추가. 경로 태깅(§2.5)은 교차 확인용으로 유지 |
+| U6 | 적격 루프 | **혼합 6블록:** `C:\Pi` 하드코딩 PS 스크립트 이식화 3 + `engines/hybrid_router` 테스트 보강 3. 블록별 지시문·R2 체크리스트는 착수 전에 파일로 고정하고 해시 기록(C3) |
+| U7 | 데몬·포트 | A 전용 데몬 **포트 9877**(2026-09-25 LISTEN 없음 확인), 승인 게이트 거쳐 수동 기동, LaunchAgent 미사용 |
+| U8 | 블라인드 | Q1 **블라인드 필수**. R4 는 유저가 arm 을 알고 있으면 **가중 0(보고용)** 으로 내린다(가중 점수는 §4-4 대로 요약용이라 판정에 영향 없음) |
+| U9 | 비열등 마진 | R2 −10%p·E2 ±15% 는 **잠정**. A/A 보정에서 쌍별 E2 비율이 ±15% 밖으로 흔들리면, 본실험 전에 E2 문턱을 A/A 관측 최대 편차로 올리고 버전을 올린다(사전 등록 규칙, 본실험 시작 후에는 바꾸지 않음) |
