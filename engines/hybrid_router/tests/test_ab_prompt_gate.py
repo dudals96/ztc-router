@@ -117,10 +117,12 @@ class GateTest(IsolatedHomeTest):
         self.assertEqual(out, b"{}")
 
     def test_skipped_for_harness_notifications(self):
-        body = json.dumps({"session_id": "s1", "prompt": "<task-notification>\n<task-id>x</task-id>"}).encode()
-        with HealthServer() as srv:
-            self.assertEqual(self.run_gate(body, srv.port), b"{}")
-        self.assertEqual(self.events()[-1]["outcome"], "system_event")
+        for prompt in ("<task-notification>\n<task-id>x</task-id>",
+                       "Another Claude session sent a message:\n<agent-message from=\"a1\">report"):
+            body = json.dumps({"session_id": "s1", "prompt": prompt}).encode()
+            with HealthServer() as srv:
+                self.assertEqual(self.run_gate(body, srv.port), b"{}")
+            self.assertEqual(self.events()[-1]["outcome"], "system_event")
 
     def test_bad_json(self):
         with HealthServer() as srv:

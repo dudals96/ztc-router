@@ -44,7 +44,8 @@ CONTEXT = """[ZTC A/B 질의 게이트 · gate_id={gate_id}]
 
 
 # Harness events that arrive through UserPromptSubmit but are not user directives.
-SYSTEM_PREFIXES = ("<task-notification", "[SYSTEM NOTIFICATION", "<system-reminder", "<local-command")
+SYSTEM_PREFIXES = ("<task-notification", "[SYSTEM NOTIFICATION", "<system-reminder", "<local-command",
+                   "<agent-message", "Another Claude session sent a message")
 
 
 def is_system_event(prompt: str) -> bool:
