@@ -9,8 +9,13 @@ dir=${0%/*}
 [ "$dir" = "$0" ] && dir=.
 out=
 # The daemon only runs on the Mac; elsewhere (Git Bash on Windows, where python3 may be
-# the Microsoft Store alias stub) answer "{}" without starting python.
-if [ "$(uname -s 2>/dev/null)" != Darwin ]; then
+# the Microsoft Store alias stub) answer "{}" without starting python. $OSTYPE is a
+# shell variable, so the check costs no process (a fork is ~110 ms in Git Bash);
+# PI_HOOK_OS overrides it for tests.
+os=${PI_HOOK_OS:-${OSTYPE-}}
+[ -n "$os" ] || os=$(uname -s 2>/dev/null)
+case $os in darwin* | Darwin) ;; *) os= ;; esac
+if [ -z "$os" ]; then
 	cat >/dev/null 2>&1
 elif [ -f "$dir/ab_prompt_gate.py" ] && command -v python3 >/dev/null 2>&1; then
 	out=$(python3 -S "$dir/ab_prompt_gate.py" 2>/dev/null)

@@ -185,5 +185,14 @@ class TestHappyPath(HookClientTest):
             self.assert_neutral(p)
 
 
+class TestNonMac(HookClientTest):
+    def test_non_darwin_skips_python(self):
+        with FakeServer() as srv:
+            proc = self.run_client(json.dumps(post_payload()).encode(), srv.port, {"PI_HOOK_OS": "msys"})
+            self.assertEqual(srv.bodies, [])
+        self.assert_neutral(proc)
+        self.assertEqual(self.events(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

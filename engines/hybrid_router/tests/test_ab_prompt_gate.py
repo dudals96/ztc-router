@@ -133,12 +133,8 @@ class GateTest(IsolatedHomeTest):
         self.assertEqual((proc.stdout, proc.returncode), (b"{}", 0))
 
     def test_non_darwin_is_silent(self):
-        fake = self.home.parent / "bin"
-        fake.mkdir(parents=True)
-        (fake / "uname").write_text("#!/bin/sh\necho MINGW64_NT-10.0-26200\n")
-        (fake / "uname").chmod(0o755)
         with HealthServer() as srv:
-            out = self.run_gate(payload(), srv.port, {"PATH": f"{fake}:{os.environ['PATH']}"})
+            out = self.run_gate(payload(), srv.port, {"PI_HOOK_OS": "msys"})
         self.assertEqual(out, b"{}")
         self.assertEqual(self.events(), [])  # python never started
 
