@@ -32,6 +32,7 @@ MAX_STDIN = 1024 * 1024
 MAX_RESPONSE = 16 * 1024
 DECISIONS = ("apply", "skip")
 EVAL_DOC = "docs/harness/AB_EVAL_ztc.md"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CONTEXT = """[ZTC A/B 질의 게이트 · gate_id={gate_id}]
 라우터 데몬이 가동 중(ready)이다. 이 지시문을 수행하기 전에 AskUserQuestion 으로 유저에게 한 번 묻는다:
@@ -50,6 +51,16 @@ SYSTEM_PREFIXES = ("<task-notification", "[SYSTEM NOTIFICATION", "<system-remind
 
 def is_system_event(prompt: str) -> bool:
     return prompt.lstrip().startswith(SYSTEM_PREFIXES)
+
+
+def gate_enabled() -> bool:
+    """config/ab_gate.json "enabled" (PI_AB_GATE_CONFIG overrides the path). Missing or
+    unreadable config means enabled, so the switch can only turn the question off."""
+    path = Path(os.environ.get("PI_AB_GATE_CONFIG") or REPO_ROOT / "config" / "ab_gate.json")
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("enabled", True) is not False
+    except (OSError, ValueError, AttributeError):
+        return True
 
 
 def in_arm(payload: dict) -> bool:
@@ -100,6 +111,8 @@ def hook() -> str:
             record["outcome"] = "bad_json"
         elif is_system_event(payload.get("prompt") if isinstance(payload.get("prompt"), str) else ""):
             record["outcome"] = "system_event"
+        elif not gate_enabled():
+            record["outcome"] = "disabled"
         elif in_arm(payload):
             record["outcome"] = "in_arm"
         elif not daemon_ready(t_start + HEALTH_BUDGET_MS / 1000):

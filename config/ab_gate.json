@@ -1,0 +1,5 @@
+{
+	"enabled": false,
+	"decided": "2026-09-25",
+	"reason": "Phase 1 shadow 는 주입 0 이라 등록해도 후보 기록뿐 — 유저 결정: Phase 2 조언 모드 게이트 통과 전까지 끔 (docs/harness/DECISION_20260925_confirmation-gates_nvg-dirty.md §1 C3)"
+}

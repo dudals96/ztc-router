@@ -57,7 +57,10 @@ def payload(cwd="/tmp/nowhere"):
 class GateTest(IsolatedHomeTest):
     def run_gate(self, stdin: bytes, port: int, env_extra=None):
         env = {k: v for k, v in os.environ.items() if k not in ("PI_AB_ARM", "CLAUDE_PROJECT_DIR")}
-        env.update({"PI_ROUTER_HOME": str(self.home), "PI_ROUTER_PORT": str(port), **(env_extra or {})})
+        cfg = self.home.parent / "ab_gate_on.json"
+        cfg.write_text('{"enabled": true}')
+        env.update({"PI_ROUTER_HOME": str(self.home), "PI_ROUTER_PORT": str(port),
+                    "PI_AB_GATE_CONFIG": str(cfg), **(env_extra or {})})
         proc = subprocess.run([str(GATE)], input=stdin, capture_output=True, env=env, timeout=5)
         self.assertEqual(proc.returncode, 0)
         self.assertEqual(proc.stderr, b"")
@@ -78,6 +81,17 @@ class GateTest(IsolatedHomeTest):
         self.assertEqual(ev["outcome"], "asked")
         self.assertIn(ev["gate_id"], ctx)
         self.assertEqual(ev["prompt_len"], len(PROMPT))
+
+    def test_silent_when_switched_off(self):
+        cfg = self.home.parent / "ab_gate_off.json"
+        cfg.write_text('{"enabled": false}')
+        with HealthServer() as srv:
+            self.assertEqual(self.run_gate(payload(), srv.port, {"PI_AB_GATE_CONFIG": str(cfg)}), b"{}")
+        self.assertEqual(self.events()[-1]["outcome"], "disabled")
+
+    def test_repo_switch_is_off_until_phase2(self):
+        cfg = json.loads((REPO_ROOT / "config" / "ab_gate.json").read_text(encoding="utf-8"))
+        self.assertIs(cfg["enabled"], False)
 
     def test_prompt_text_never_stored(self):
         with HealthServer() as srv:
