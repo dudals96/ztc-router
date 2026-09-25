@@ -1,9 +1,9 @@
 #!/bin/sh
-# ZTC A/B prompt gate (Claude Code UserPromptSubmit).
-# While the router daemon reports ready, asks Claude to put one AskUserQuestion to the
-# user: should this directive's loop / work turn join the A/B evaluation
-# (docs/harness/AB_EVAL_ztc.md)? Invariant: exit 0, stdout is "{}" or one JSON object
-# carrying hookSpecificOutput.additionalContext; never blocks the prompt.
+# ZTC evaluation gate (UserPromptSubmit, Claude Code and Codex; registered globally).
+# For a work-loop directive, asks the agent to put one question to the user first:
+# should this loop join the ZTC evaluation (docs/harness/AB_EVAL_ztc.md)? Keeps asking
+# until the user says "ZTC 평가 중지". Invariant: exit 0, stdout is "{}" or one JSON
+# object carrying hookSpecificOutput.additionalContext; never blocks the prompt.
 exec 2>/dev/null
 dir=${0%/*}
 [ "$dir" = "$0" ] && dir=.

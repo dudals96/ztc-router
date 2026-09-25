@@ -57,6 +57,7 @@
 | 문서상 계약 | stdin: 공통 필드(`session_id`·`cwd`·`transcript_path`·`model`) + `hook_event_name`·`tool_name`·`tool_input`·`tool_use_id`(Post 는 `tool_response` 추가). 중립 `{}`+exit 0 이면 정상 권한 흐름. `timeout` 초, 기본 600. exit 2+stderr 사유는 차단. Post 는 결과 피드백·교체 동작이 문서화돼 있으나 Phase 1 미사용 | [문서-B] | 대상 아님. 실행 여부는 여전히 **미확인** |
 | Codex 가 `CLAUDE_PROJECT_DIR` 를 설정하는지 | **미확인** — 머지본 Codex 명령은 이 변수에 의존하지 않고 git 루트로 경로를 찾는다 | [코드] | — |
 | 현 저장소 등록 (머지본) | `sh "$(git rev-parse --show-toplevel 2>/dev/null \|\| pwd)/scripts/hooks/tier2-gate.sh" \|\| py c:/Pi/scripts/tier2-gate-hook.py` | [코드] `.codex/hooks.json:9` | M1 (G1). Codex 실행 미검증 |
+| **UserPromptSubmit** (2026-09-25 추가 확인) | **지원.** 입력 스키마 `user-prompt-submit.command.input`(필수: `cwd`·`hook_event_name`·`model`·`permission_mode`·`prompt`·`session_id`·`transcript_path`·`turn_id`), 출력 스키마는 Claude Code 와 같은 `hookSpecificOutput.additionalContext`(`additionalProperties: false`). 실사용: 전역 `~/.codex/config.toml` 의 UserPromptSubmit 훅 평문 출력이 09-25 Codex(VS Code 0.154) 세션에 developer 메시지로 주입됨. 프로젝트 `Pi/.codex/hooks.json` 의 pre_tool_use·stop 은 `hooks.state` 에 신뢰 해시가 있어 로드 대상. **새로 추가·변경된 훅은 시작 시 "Hooks need review" 에서 신뢰해야 실행된다** | [설치판] 스키마 문자열, [실측] 세션 기록, `docs/evidence/ab-gate-codex-20260925/` | 평가 편입 게이트를 전역 등록(09-25) |
 
 ### 1.4 Antigravity
 | 항목 | 지원 | 근거 | Phase 1 |

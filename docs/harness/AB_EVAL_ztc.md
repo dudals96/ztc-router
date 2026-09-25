@@ -30,7 +30,7 @@
 
 ### 2.2 격리 규칙
 - **worktree·브랜치:** `~/Pi-wt/ab-<date>-<slug>-A`, `…-B`, 브랜치 `ab/<date>-<slug>-{A,B}`, 같은 커밋에서 분기. **push 금지**(원격 없음, 지시문에 명시). 훅 명령은 `$CLAUDE_PROJECT_DIR` 기준이므로(`.claude/settings.json:116,127`) 각 arm 은 자기 worktree 의 스크립트를 쓴다.
-- **질의 게이트 차단:** 두 worktree 루트에 미추적 파일 `.pi-ab-arm`(내용 `A`/`B`)을 두거나 `PI_AB_ARM` 을 지정해 A/B 질의 게이트(`scripts/hooks/ab-prompt-gate.sh`, UserPromptSubmit)가 arm 세션 안에서는 묻지 않게 한다. 게이트의 질의·답은 `$PI_ROUTER_HOME/telemetry/ab_gate.jsonl` 에 gate_id 로 남으며(지시문 원문은 저장 안 함), `apply` 로 답한 gate_id 가 A/B 후보 목록이다.
+- **질의 게이트 차단:** 두 worktree 루트에 미추적 파일 `.pi-ab-arm`(내용 `A`/`B`)을 두거나 `PI_AB_ARM` 을 지정해 A/B 질의 게이트(`scripts/hooks/ab-prompt-gate.sh`, UserPromptSubmit)가 arm 세션 안에서는 묻지 않게 한다. 게이트의 질의·답은 `$PI_ROUTER_HOME/telemetry/ab_gate.jsonl` 에 gate_id 로 남으며(지시문 원문은 저장 안 함), `apply` 로 답한 gate_id 가 A/B 후보 목록이다. 게이트는 2026-09-25 부터 Claude Code·Codex 전역 등록이며 작업 루프 지시문에만 묻는다(유저가 `ZTC 평가 중지`로 멈춤, DECISION_20260925 §3).
 - **라우터 원자료 분리:** A 는 `PI_ROUTER_HOME=~/.pi-router-ab/<date>-<slug>-A`, `PI_ROUTER_PORT=<main 9876 과 다른 포트>` 로 전용 데몬 1개. 두 값은 환경변수로 받는다(`engines/hybrid_router/ztc/paths.py:19,24`). B 도 빈 전용 `PI_ROUTER_HOME` 을 지정해 두고, 종료 후 **비어 있어야 정상**(비어 있지 않으면 오염 기록). main 의 상시 shadow 데몬(9876)은 어느 arm 도 쓰지 않는다.
 - **Tier-2 로그:** 게이트 로그는 worktree 별 `learning/remote-approvals/tier2-gate-log.jsonl` 에 쌓인다(`scripts/tier2-gate-hook.py:54-56`, REPO = 스크립트 위치 기준). arm 간 섞이지 않는다.
 - **대상 적격성:** 루프가 원격 노드(SSH·TeamViewer 착탄), NV 저장소, launchd·LaunchAgent, 공유 외부 서비스(Discord 봇·GitHub PR·원격 API 쓰기)를 건드리면 **부적격**. 두 arm 이 같은 외부 상태를 바꾸면 서로 오염되고 되돌릴 수 없다. 적격 = Pi 저장소 안에서 로컬 파일·로컬 테스트로 끝나는 루프.

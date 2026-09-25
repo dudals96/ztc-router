@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Health check for the router daemon and the ZTC evaluation gate: every 5 minutes and at
+  login, scripts/router_healthcheck.py restarts a daemon that is not ready and notifies on
+  a change of status. Registered 2026-09-25 by user instruction.
+  Placeholders: __PYTHON3__ (absolute python3), __REPO__ (absolute checkout path),
+  __PORT__ (daemon port, 9876), __ROUTER_HOME__ (default __HOME__/.pi-router).
+  Install: substitute, copy to ~/Library/LaunchAgents/com.pi.router-healthcheck.plist,
+  `launchctl bootstrap gui/$UID <that path>`. Remove: `launchctl bootout gui/$UID/com.pi.router-healthcheck`.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.pi.router-healthcheck</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__PYTHON3__</string>
+		<string>__REPO__/scripts/router_healthcheck.py</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PI_ROUTER_PORT</key>
+		<string>__PORT__</string>
+		<key>PI_ROUTER_HOME</key>
+		<string>__ROUTER_HOME__</string>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>300</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>Umask</key>
+	<integer>63</integer>
+	<key>StandardOutPath</key>
+	<string>__ROUTER_HOME__/healthcheck.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>__ROUTER_HOME__/healthcheck.err.log</string>
+</dict>
+</plist>

@@ -1,5 +1,5 @@
 {
-	"enabled": false,
+	"enabled": true,
 	"decided": "2026-09-25",
-	"reason": "Phase 1 shadow 는 주입 0 이라 등록해도 후보 기록뿐 — 유저 결정: Phase 2 조언 모드 게이트 통과 전까지 끔 (docs/harness/DECISION_20260925_confirmation-gates_nvg-dirty.md §1 C3)"
+	"reason": "유저 지시(2026-09-25 저녁): 모든 프로젝트의 작업 루프 지시문마다 ZTC 평가 편입 여부를 먼저 묻는다. 유저가 'ZTC 평가 중지'라고 명시하면 멈춘다($PI_ROUTER_HOME/ab_gate_state.json). 이 값은 저장소 전체 비상 스위치 — false 면 어떤 경우에도 묻지 않는다. 이전 결정(Phase 2 전까지 끔, DECISION_20260925 §1 C3)을 대체한다."
 }

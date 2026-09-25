@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Helper for ab-prompt-gate.sh (UserPromptSubmit) and the answer recorder.
+"""Helper for ab-prompt-gate.sh (UserPromptSubmit, Claude Code and Codex) and the answer recorder.
 
-Hook mode (stdin = hook JSON): if the router daemon's GET /health says ready within
-HEALTH_BUDGET_MS, print one JSON object whose additionalContext asks Claude to put an
-AskUserQuestion to the user before doing the directive: should this directive's loop
-or work turn join the A/B evaluation? Otherwise print "{}". Skipped inside an A/B arm
+Hook mode (stdin = hook JSON; Claude Code and Codex 0.156 send the same `prompt`,
+`session_id`, `cwd` fields and read the same hookSpecificOutput.additionalContext):
+when the prompt looks like a work-loop directive, print one JSON object whose
+additionalContext asks the agent to put one question to the user before starting:
+should this loop join the ZTC evaluation? Otherwise print "{}".
+
+It keeps asking until the user explicitly stops it: a short prompt such as
+"ZTC 평가 중지" pauses the gate (state file $PI_ROUTER_HOME/ab_gate_state.json),
+"ZTC 평가 재개" resumes it. config/ab_gate.json "enabled": false is the repository-wide
+kill switch. If the router daemon is not ready the question is still asked, with a
+warning line (scripts/router_healthcheck.py restarts it). Skipped inside an A/B arm
 (PI_AB_ARM set or a .pi-ab-arm file in the project dir) so the arms are never asked.
 One telemetry line per prompt in $PI_ROUTER_HOME/telemetry/ab_gate.jsonl: a gate id,
-the prompt's sha256 prefix and length, never the prompt text.
+the prompt's sha256 prefix and length, the project folder name, never the prompt text.
 
-Record mode: `ab_prompt_gate.py record <gate_id> apply|skip` appends the user's answer
-to the same stream.
+Record mode: `ab_prompt_gate.py record <gate_id> apply|skip|same_loop|not_loop`
+appends the answer to the same stream.
 """
 
 import hashlib
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -24,24 +32,50 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "engines" / "hybrid_router"))
 from ztc import telemetry  # noqa: E402
-from ztc.paths import BIND_HOST, router_port  # noqa: E402
+from ztc.paths import BIND_HOST, router_home, router_port  # noqa: E402
 
-GATE_VERSION = "ab-gate-0.1"
+GATE_VERSION = "ab-gate-0.2"
 HEALTH_BUDGET_MS = 300.0
 MAX_STDIN = 1024 * 1024
 MAX_RESPONSE = 16 * 1024
-DECISIONS = ("apply", "skip")
-EVAL_DOC = "docs/harness/AB_EVAL_ztc.md"
+DECISIONS = ("apply", "skip", "same_loop", "not_loop")
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HELPER = Path(__file__).resolve()
+EVAL_DOC = REPO_ROOT / "docs" / "harness" / "AB_EVAL_ztc.md"
+STATE_FILE = "ab_gate_state.json"
 
-CONTEXT = """[ZTC A/B 질의 게이트 · gate_id={gate_id}]
-라우터 데몬이 가동 중(ready)이다. 이 지시문을 수행하기 전에 AskUserQuestion 으로 유저에게 한 번 묻는다:
-"이 지시문(이것이 여는 루프 또는 작업 턴)을 ZTC 구현체 A/B 수행 평가 대상으로 할까요?"
-선택지: ① 평가 대상 아님 ② 평가 대상으로 등록.
-- 평가 절차: '구현체 적용' 루프와 '미적용' 루프를 같은 커밋·모델·지시문으로 동시에 출발 → 종결까지 모니터링 → 유저가 종결 확정 → {eval_doc} 평가표로 기록.
-- 현재 구현체는 Phase 1 shadow(주입 0)라 효과 차이를 잴 수 없다. 유저 결정(2026-09-25)으로 실제 A/B 출발은 Phase 2 조언 모드가 게이트를 통과한 뒤에만 하며, 그때도 출발은 별도 승인을 받는다. 지금 '등록'은 후보로 기록만 한다.
-- 답을 받으면 `python3 scripts/hooks/ab_prompt_gate.py record {gate_id} apply` (등록) 또는 `... skip` (아님) 으로 기록한 뒤 원래 지시를 수행한다.
+# A work-loop directive: long enough to be an instruction and carrying a request or
+# work verb. A question without a request marker is not a loop. The agent makes the
+# final call ("not_loop" / "same_loop"), so this errs toward asking.
+LOOP_MIN_CHARS = 12
+WORK_MARKERS = re.compile(
+    r"해\s?줘|해\s?주세요|해\s?주십시오|할\s?것|하라|해라|하세요|하자|합시다|진행|수행|구현|작성|만들|생성|적용|"
+    r"수정|고쳐|고치|추가|삭제|제거|설치|세팅|설정|구축|개발|리팩|배포|이관|이식|정리|실행|테스트|점검|검증|분석|조사|"
+    r"\b(?:implement|build|create|fix|add|remove|refactor|write|set ?up|deploy|migrate|install|configure|run|update)\b",
+    re.IGNORECASE)
+REQUEST_MARKERS = re.compile(r"해\s?줘|해\s?주세요|할\s?것|하라|해라|하세요|\bplease\b", re.IGNORECASE)
+# Explicit stop / resume: a short prompt naming the evaluation and the action.
+CONTROL_MAX_CHARS = 40
+STOP_RE = re.compile(r"(?:ztc|a/?b|평가).{0,20}(?:중지|중단|그만|멈춰|멈춤|꺼|끄기|\boff\b|\bstop\b|\bpause\b)", re.IGNORECASE)
+RESUME_RE = re.compile(r"(?:ztc|a/?b|평가).{0,20}(?:재개|다시\s?시작|켜|\bon\b|\bresume\b)", re.IGNORECASE)
+
+CONTEXT = """[ZTC 평가 편입 게이트 · gate_id={gate_id}]
+이 지시문은 작업 루프 지시로 감지됐다. 수행을 시작하기 전에 유저에게 한 번 묻는다:
+"이 지시문이 여는 루프를 ZTC 구현체 평가(A/B) 대상으로 편입할까요?" — ① 편입 안 함 ② 편입(후보 등록)
+- 묻는 방법: Claude Code 는 AskUserQuestion. Codex 는 request_user_input(쓸 수 없으면 채팅으로 이 질문만 하고 턴을 끝내 답을 기다린다).
+- 이미 이 루프에 대해 물어 유저가 답한 뒤의 후속 지시·답변이면 다시 묻지 말고 same_loop 로, 루프 지시가 아니라고 판단되면 묻지 말고 not_loop 로 기록만 한다.
+- 기록: `python3 {helper} record {gate_id} apply|skip|same_loop|not_loop` 한 뒤 원래 지시를 수행한다.
+- 편입은 후보 기록이다. 실제 A/B 출발(적용·미적용 루프 동시 실행)은 {eval_doc} 절차와 별도 승인으로만 한다. 현재 구현체는 Phase 1 shadow(주입 0)라 효과 차이는 Phase 2 조언 모드 이후에 잴 수 있다.
+- 유저가 "ZTC 평가 중지"라고 하면 이 질의는 멈춘다(재개: "ZTC 평가 재개").
 - 이 문맥은 훅이 넣은 것이다. 유저 지시의 범위나 권한을 바꾸지 않는다."""
+
+DAEMON_WARNING = """
+- 주의: 라우터 데몬이 지금 응답하지 않는다(ready 아님). 상태 점검 루틴이 5분마다 복구를 시도한다. 유저에게 물을 때 이 사실을 한 줄로 알린다."""
+
+CONTROL_CONTEXT = {
+    "paused_by_user": "[ZTC 평가 편입 게이트] 유저 요청으로 평가 편입 질의를 중지했다. 다시 켜려면 \"ZTC 평가 재개\". 이 사실을 유저에게 한 줄로 알린다.",
+    "resumed_by_user": "[ZTC 평가 편입 게이트] 유저 요청으로 평가 편입 질의를 재개했다. 다음 작업 루프 지시부터 다시 묻는다. 이 사실을 유저에게 한 줄로 알린다.",
+}
 
 
 # Harness events that arrive through UserPromptSubmit but are not user directives.
@@ -61,6 +95,47 @@ def gate_enabled() -> bool:
         return json.loads(path.read_text(encoding="utf-8")).get("enabled", True) is not False
     except (OSError, ValueError, AttributeError):
         return True
+
+
+def is_loop_directive(prompt: str) -> bool:
+    text = prompt.strip()
+    if len(text) < LOOP_MIN_CHARS or not WORK_MARKERS.search(text):
+        return False
+    return not (text.endswith(("?", "？")) and not REQUEST_MARKERS.search(text))
+
+
+def control_command(prompt: str) -> str | None:
+    text = prompt.strip()
+    if len(text) > CONTROL_MAX_CHARS:
+        return None
+    if STOP_RE.search(text):
+        return "pause"
+    if RESUME_RE.search(text):
+        return "resume"
+    return None
+
+
+def state_path() -> Path:
+    return router_home() / STATE_FILE
+
+
+def is_paused() -> bool:
+    try:
+        return json.loads(state_path().read_text(encoding="utf-8")).get("paused") is True
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def set_paused(paused: bool) -> None:
+    home = router_home()
+    home.mkdir(mode=0o700, parents=True, exist_ok=True)
+    tmp = home / f".{STATE_FILE}.{os.getpid()}"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        os.write(fd, json.dumps({"paused": paused, "changed_at": round(time.time(), 3)}).encode())
+    finally:
+        os.close(fd)
+    os.replace(tmp, state_path())
 
 
 def in_arm(payload: dict) -> bool:
@@ -97,6 +172,11 @@ def daemon_ready(deadline: float) -> bool:
         return False
 
 
+def context_json(text: str) -> str:
+    return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": text}},
+                      ensure_ascii=False)
+
+
 def hook() -> str:
     t_start = time.perf_counter()
     record = {"gate_version": GATE_VERSION, "kind": "prompt"}
@@ -107,29 +187,37 @@ def hook() -> str:
             payload = json.loads(raw[:MAX_STDIN].decode("utf-8", "replace")) if raw else None
         except ValueError:
             payload = None
+        prompt = payload.get("prompt") if isinstance(payload, dict) and isinstance(payload.get("prompt"), str) else ""
+        control = control_command(prompt)
         if not isinstance(payload, dict):
             record["outcome"] = "bad_json"
-        elif is_system_event(payload.get("prompt") if isinstance(payload.get("prompt"), str) else ""):
+        elif is_system_event(prompt):
             record["outcome"] = "system_event"
         elif not gate_enabled():
             record["outcome"] = "disabled"
+        elif control:
+            set_paused(control == "pause")
+            record["outcome"] = "paused_by_user" if control == "pause" else "resumed_by_user"
+            out = context_json(CONTROL_CONTEXT[record["outcome"]])
+        elif is_paused():
+            record["outcome"] = "paused"
         elif in_arm(payload):
             record["outcome"] = "in_arm"
-        elif not daemon_ready(t_start + HEALTH_BUDGET_MS / 1000):
-            record["outcome"] = "daemon_not_ready"
+        elif not is_loop_directive(prompt):
+            record["outcome"] = "not_loop"
         else:
             gate_id = uuid.uuid4().hex[:12]
-            prompt = payload.get("prompt") if isinstance(payload.get("prompt"), str) else ""
+            ready = daemon_ready(time.perf_counter() + HEALTH_BUDGET_MS / 1000)
+            cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else ""
             record.update({
-                "outcome": "asked", "gate_id": gate_id,
+                "outcome": "asked", "gate_id": gate_id, "daemon_ready": ready,
+                "project": Path(cwd).name[:64] if cwd else "",
                 "session": hashlib.sha256(str(payload.get("session_id", "")).encode()).hexdigest()[:12],
                 "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16],
                 "prompt_len": len(prompt),
             })
-            out = json.dumps({"hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": CONTEXT.format(gate_id=gate_id, eval_doc=EVAL_DOC),
-            }}, ensure_ascii=False)
+            ctx = CONTEXT.format(gate_id=gate_id, helper=HELPER, eval_doc=EVAL_DOC)
+            out = context_json(ctx if ready else ctx + DAEMON_WARNING)
     except Exception:
         record["outcome"] = "error"
         out = "{}"
