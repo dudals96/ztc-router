@@ -1,0 +1,25 @@
+# git filter-repo --paths-from-file 입력 (Pi main @ a3ed310, 2026-09-28)
+# 이후 engines/hybrid_router/tests/test_tier2_gate_wrapper.py 를 --invert-paths 로 제외
+engines/hybrid_router/
+scripts/hybrid-router-daemon.py
+scripts/hybrid-router-cli.py
+scripts/router_healthcheck.py
+scripts/decision-gate-interceptor.py
+scripts/hooks/router-client.sh
+scripts/hooks/router_client.py
+scripts/hooks/ab-prompt-gate.sh
+scripts/hooks/ab_prompt_gate.py
+config/launchd/com.pi.router-daemon.plist.template
+config/launchd/com.pi.router-healthcheck.plist.template
+config/ab_gate.json
+config/routing_policy.json
+docs/PLAN_ZTC_topology_optimization.md
+docs/harness/AB_EVAL_ztc.md
+docs/harness/EVAL_PROTOCOL_ztc.md
+docs/harness/HOOK_CONTRACT_ztc.md
+glob:docs/evidence/ztc-*
+tasks/claude-code-to-opus55__ztc-phase1-impl.md
+tasks/codex-to-gpt6-luna__ztc-phase1-impl.md
+tasks/ztc-phase1-dual-draft__merge-protocol.md
+config/anti_pattern_rules.json
+config/jev_config.json
