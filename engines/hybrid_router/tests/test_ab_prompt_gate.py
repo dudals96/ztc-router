@@ -203,6 +203,30 @@ class GateTest(IsolatedHomeTest):
                 self.assertEqual(self.run_gate(body, srv.port), b"{}")
             self.assertEqual(self.events()[-1]["outcome"], "system_event")
 
+    def test_skipped_for_peer_messages(self):
+        # Shapes seen 2026-10-03: subagent hand-back and cross-session message, with the
+        # "Another Claude session" line or starting with the tag (queued delivery). Bodies
+        # carry work-loop wording and a stop phrase, which must neither ask nor pause.
+        for prompt in (
+                "Another Claude session sent a message:\n<agent-message from=\"a053ea78665ad2b81\">\n"
+                "[Subagent hand-back] 로그인 버그를 고쳐줘, 테스트도 추가하고\n</agent-message>",
+                "Another Claude session sent a message:\n<cross-session-message from=\"uds:/tmp/cc-socks/1.sock\" "
+                "from-name=\"peer\" from-mode=\"prompting\">\n홈 경로를 가려 주세요. 구현해줘\n</cross-session-message>",
+                "<agent-message from=\"a1\">\nPlease implement the retry logic\n</agent-message>",
+                "\n  <cross-session-message from=\"uds:x\">ZTC 평가 중지</cross-session-message>"):
+            with HealthServer() as srv:
+                self.assertEqual(self.run_gate(payload(prompt=prompt), srv.port), b"{}", prompt)
+            self.assertEqual(self.events()[-1]["outcome"], "system_event", prompt)
+        self.assertFalse((self.home / "ab_gate_state.json").exists())
+
+    def test_user_text_mentioning_peer_tags_still_asks(self):
+        for prompt in ("<agent-message 태그 처리 로직을 구현해줘",
+                       "방금 Another Claude session sent a message 가 온 경로를 수정해줘",
+                       "<cross-session-messages> 파서를 고쳐줘"):
+            with HealthServer() as srv:
+                self.run_gate(payload(prompt=prompt), srv.port)
+            self.assertEqual(self.events()[-1]["outcome"], "asked", prompt)
+
     def test_bad_json(self):
         with HealthServer() as srv:
             self.assertEqual(self.run_gate(b"not json", srv.port), b"{}")

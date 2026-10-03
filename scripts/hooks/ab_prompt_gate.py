@@ -79,12 +79,18 @@ CONTROL_CONTEXT = {
 
 
 # Harness events that arrive through UserPromptSubmit but are not user directives.
-SYSTEM_PREFIXES = ("<task-notification", "[SYSTEM NOTIFICATION", "<system-reminder", "<local-command",
-                   "<agent-message", "Another Claude session sent a message")
+SYSTEM_PREFIXES = ("<task-notification", "[SYSTEM NOTIFICATION", "<system-reminder", "<local-command")
+# Subagent hand-back reports and cross-session peer messages: "Another Claude session sent a
+# message:" and/or an opening <agent-message from=...> / <cross-session-message from=...> tag at
+# the start (queued deliveries start with the tag itself). Matched on structure at the start only,
+# so a user sentence that merely mentions these words is still judged as a prompt.
+PEER_MESSAGE_RE = re.compile(
+    r"(?:Another Claude session sent a message|<(?:agent-message|cross-session-message)(?:\s+from=|>))")
 
 
 def is_system_event(prompt: str) -> bool:
-    return prompt.lstrip().startswith(SYSTEM_PREFIXES)
+    text = prompt.lstrip()
+    return text.startswith(SYSTEM_PREFIXES) or PEER_MESSAGE_RE.match(text) is not None
 
 
 def gate_enabled() -> bool:
