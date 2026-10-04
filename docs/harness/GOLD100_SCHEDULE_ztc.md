@@ -1,7 +1,8 @@
 # GOLD100_SCHEDULE_ztc — gold 100건 라벨링 일정 (초안, 10-05 → 10-09)
 
 - 작성: 2026-10-04, Claude Code (Opus 5.5) 서브에이전트 @ richardkim-macpro. `PHASE2_READINESS_ztc.md` D4("Phase 2 첫 주에 유저 검수 일정") 의 후속.
-- 성격: **초안 + 읽기 전용 점검.** 코드·설정·`$PI_ROUTER_HOME` 은 바꾸지 않았다. 후보 수는 원자료를 메모리에서 세기만 했다(파일 쓰기 0). `[제안]` 은 에이전트 제안, **HITL** 은 유저 결정 필요.
+- 갱신: 2026-10-04 — **H1–H7 전부 추천안대로 결정(유저 AUQ)**, §6 참조. §4.2 도구 구현·커밋 `09639e1`(합성 시험만, 실데이터 추출·`gold/` 생성은 아직 안 함).
+- 성격(최초): **초안 + 읽기 전용 점검.** 코드·설정·`$PI_ROUTER_HOME` 은 바꾸지 않았다. 후보 수는 원자료를 메모리에서 세기만 했다(파일 쓰기 0). `[제안]` 은 에이전트 제안, **HITL** 은 유저 결정 필요.
 - 기준 문서: `docs/PLAN_ZTC_topology_optimization.md`(이하 PLAN), `docs/harness/EVAL_PROTOCOL_ztc.md`(이하 EVAL), `engines/hybrid_router/ztc/gold.py`, `scripts/bench/gold_tool.py`.
 - 이 문서에는 개수·날짜·클래스 이름만 싣는다. 오류 본문·명령문·대화 원문·계정·세션 ID 는 싣지 않는다.
 
@@ -33,7 +34,7 @@ gold 1건 = **마스킹된 Bash 실패 본문 1개에 유저가 붙인 오류 �
 | 2.4 gold 300 + 파레토 | gold 100 선행 | 착수 가능해진다 | PLAN:172, `PHASE2_READINESS_ztc.md:37` |
 | L1/L2 삽입 게이트 | gold 에서 L0 미해결 ≥ 20% | 첫 추정치(표본 부족 표기) | PLAN:107 |
 
-### 1.3 2.1 의 순환을 푸는 방법 `[제안]` — **HITL H4**
+### 1.3 2.1 의 순환을 푸는 방법 — **H4 채택(2026-10-04)**, PLAN v0.3.1 2.1·EVAL §2.3 반영
 - K4 는 주입이 있어야 분모가 생긴다. 그래서 2.1 첫 단계(shadow → `additionalContext`)의 **진입** 조건을 gold 기반 대리 지표로 두고, K4 는 **유지** 조건(주입 뒤 실측, 넘으면 클래스 opt-in 해제 — PLAN R2 완화책)으로 쓰는 안.
 - 대리 지표 후보: 클래스 X 에 대해 "holdout 에서 L0 가 X 라고 판정한 행 중 유저 라벨이 X 가 아닌 비율"(L0 정밀도의 보수). 이 값 ≤ 10% 이고 그 클래스 판정 건수 ≥ 20 일 때만 그 클래스를 `additionalContext` 대상으로.
 - 정직한 한계: gold 100 에서는 클래스별 20건을 못 채우므로 이 대리 지표로도 **10-09 에 opt-in 가능한 클래스는 0개일 가능성이 높다**. 2.1 실주입은 gold 300(2.4) 쪽에서 열린다고 보는 것이 맞다 `[추정]`.
@@ -67,6 +68,11 @@ gold 1건 = **마스킹된 Bash 실패 본문 1개에 유저가 붙인 오류 �
 ## 3. 일정 (10-05 월 → 10-09 금·한글날)
 라벨은 **유저**, 추출·층화·tune 초벌(pre-fill)·검증·집계는 **에이전트** `[제안]`. 1건 소요 추정: holdout 블라인드 ≈ 40초, tune 초벌 확인 ≈ 20초 `[추정]`.
 
+실행 명령(저장소 루트에서, `$PI_ROUTER_HOME` 기본 `~/.pi-router`):
+- 추출(1회): `python3 scripts/bench/gold_draft.py extract --since 2026-09-24 --n 120 --seed 20261005`
+- 라벨: `python3 scripts/bench/gold_draft.py label --split holdout --limit 15` / `... label --split tune --limit 10`
+- 진행: `python3 scripts/bench/gold_draft.py status`, 검증: `python3 scripts/bench/gold_tool.py validate`
+
 | 날짜 | 에이전트 | 유저 라벨(누적) | 유저 시간 | 비고 |
 |---|---|---|---|---|
 | 10-05 월 | H1–H3 결정 받기 → 추출 도구 작성·시험(합성 데이터) → 120건 추출·분할·검증 | tune 15 (15) — 라벨 기준 맞추기, 애매한 건 기준표(§4.2)에 메모 | 15분 | 저녁 1회. 기준표 확정 |
@@ -76,12 +82,12 @@ gold 1건 = **마스킹된 Bash 실패 본문 1개에 유저가 붙인 오류 �
 | 10-09 금 | validate → holdout 봉인 → `gold_tool.py stats` → K3 첫 값 | tune 10 (100) | 5분 | Phase 2 시작일 |
 | 합계 | | **100** | **약 70분** | |
 
-### 3.1 10-09 판정 `[제안]` — **HITL H6**
+### 3.1 10-09 판정 — **H6 채택(2026-10-04)**
 gold 개수는 **Phase 2 시작일을 바꾸지 않는다** — 100건이어도 K4 는 안 열리고(§1.2), 10-09 첫 착수 항목은 원래 gold 없이 되는 일이다(`PHASE2_READINESS_ztc.md:10`).
 
 | 10-09 상태 | 결정 |
 |---|---|
-| ≥ 100 (holdout ≥ 30) | Phase 1.6 exit 기록, K3 첫 값(전 클래스 "표본 부족" 표기), 2.4 gold 300 착수. 2.1 은 설계(+H4 대리 지표 산출) |
+| ≥ 100 (holdout ≥ 30) | Phase 1.6 exit 기록, K3 첫 값(전 클래스 "표본 부족" 표기), 2.4 gold 300 착수. 2.1 은 설계(+H4 대리 지표 산출만 — `gold_tool.py stats` 의 `l21_entry_proxy`) |
 | 60–99 | Phase 2 예정대로 시작. K3 는 "잠정(n=k)" 로만 기록, 2.4 착수 보류, 라벨 하루 20건으로 계속 → 10-12 전후 100 |
 | < 60 또는 holdout < 30 | Phase 2 예정대로 시작, K3 "기준선 미확보" 유지, 2.1 설계만. 일정 재수립 |
 | 공통 | **2.1 실주입(K4 게이트 없이 `additionalContext`)은 어느 경우에도 10-09 에 켜지 않는다** (PLAN:103 전환 게이트) |
@@ -93,10 +99,21 @@ gold 개수는 **Phase 2 시작일을 바꾸지 않는다** — 100건이어도 
 |---|---|---|
 | 스키마 검증·집계 `ztc/gold.py` | 있음(합성 시험 `tests/test_gold.py`) | `gold.py:28-138` |
 | `scripts/bench/gold_tool.py validate`·`stats` | 있음. **행을 만들지 않는다**("labelling is a user review step") | `gold_tool.py:2-5` |
-| 후보 추출기(트랜스크립트 → 마스킹 후보) | **없음** | — |
-| 라벨 입력 CLI | **없음** | — |
+| 후보 추출기(트랜스크립트 → 마스킹 후보) | **있음** `gold_draft.py extract` (2026-10-04, `09639e1`) | §4.2 |
+| 라벨 입력 CLI | **있음** `gold_draft.py label`·`status` (같은 커밋) | §4.2 |
+| 2.1 진입 대리 지표 집계 | **있음** `gold.aggregate` → `gold_stats.json` 의 `l21_entry_proxy` (같은 커밋) | EVAL §2.3 |
 
-### 4.2 최소 도구안 `[제안]` (작성하지 않음 — **HITL H2**)
+### 4.2 최소 도구안 — **구현됨** (`scripts/bench/gold_draft.py`, 커밋 `09639e1`, H2 승인)
+구현 메모(제안과 다른 점·구체화):
+- 하위 명령 3개: `extract`·`label` 에 더해 `status`(개수만 — split·클래스·일자·검증 오류 수, 본문 출력 없음).
+- 마스킹은 훅 클라이언트의 `build_body()`(PostToolUseFailure `error` 경로)를 그대로 부른 뒤 데몬처럼 `mask_text` 를 한 번 더 적용한다(멱등). 그 뒤 `gold.validate_row` 를 통과한 행만 후보.
+- 분할 해시는 시드와 무관(`sha256("ztc-gold-split/1" + 세션해시)` 의 70/30) — 다시 추출해도 세션의 split 은 안 바뀐다. tune 에 같은 시그니처가 있는 holdout 행은 **표본 추출 전 풀에서** 뺀다.
+- 프로젝트 상한은 목표 n 의 50%(n=120 → 60건). 풀이 n 을 못 채우면 최종 비율은 50% 를 넘을 수 있고, 그 값은 `extract_meta.json`·출력의 `max_project_share` 에 그대로 남긴다.
+- 추가 출력 `gold/extract_meta.json`(개수·제외 사유별 개수·시드). 기존 `candidates.jsonl` 은 `--force` 없이 덮어쓰지 않는다.
+- 저장소 안(`ztc.paths.ensure_outside_repo`)과 다른 git 작업트리 안 경로를 모두 거부. 디렉터리 0700, 파일 0600(O_NOFOLLOW).
+- 시험: `engines/hybrid_router/tests/test_gold_draft.py` 16건(합성 트랜스크립트 픽스처, 실데이터 0).
+
+아래는 원 제안문(기록용).
 `scripts/bench/gold_draft.py` 하나, 하위 명령 2개. 쓰기는 `$PI_ROUTER_HOME/gold/` 에만(0700/0600, 저장소 안 경로 거부 — `ztc.paths` 재사용).
 1. `extract --since 2026-09-24 --n 120 --seed <고정>`: 트랜스크립트에서 §2.2 규칙대로 뽑아 `gold/candidates.jsonl` 에 저장. 행마다 `mask_text`(클라이언트와 같은 마스커, cwd 마스킹) → 500자 절단 → `gold.validate_row` 통과분만. `group.session` = 세션 ID sha256 앞 12, `group.signature` = `l0.signature()`, `group.project` = 폴더 마지막 이름, `attribution` = `l0.attribution()`, `split` = 세션 해시 결정적 배정. **tune 행에만** `draft_label`(L0 regex, 없으면 비움) 을 붙인다.
 2. `label [--split holdout|tune]`: 한 건씩 마스킹 본문·프로그램 첫 토큰·exit code 만 보여 주고 숫자키 1–6 으로 라벨, `s` 건너뜀, `q` 저장 후 종료. 저장 시 `label_source: "user"`, `created_at`, `v1.jsonl` 에 추가. holdout 은 초벌을 **보여 주지 않는다**.
@@ -125,18 +142,18 @@ gold 개수는 **Phase 2 시작일을 바꾸지 않는다** — 100건이어도 
 | R6 | 라벨러 1인 | 일관성 검증 없음(카파 불가) | 10-09 에 tune 10건 재라벨(블라인드)로 자기 일치율만 보고 `[제안]` |
 | R7 | live 저장소 | `gold_draft.py` 커밋·`gold/` 생성은 live 환경 변경 | 도구 커밋·폴더 생성 각각 승인(H1·H2) |
 
-## 6. 결정 필요 (HITL)
-| # | 질문 | 추천안 |
-|---|---|---|
-| H1 | gold 후보 출처를 트랜스크립트(Claude, +Codex?)로 하고 `~/.pi-router/gold/` 를 만들어도 되나 | Claude 트랜스크립트만, 폴더 생성 승인. Codex 는 2.4 에서 |
-| H2 | `gold_draft.py`(extract·label) 를 이 저장소에 작성·커밋해도 되나 | 작성 → 합성 시험 → 커밋(push 는 별도) |
-| H3 | 표본 규칙(§2.2: 제외 대상·층화·세션 ≤ 4·시그니처 ≤ 2·120 추출) | 그대로 |
-| H4 | 2.1 진입을 gold 대리 지표(클래스별 L0 오판정 ≤ 10%, n ≥ 20)로 두고 K4 는 유지 조건으로 바꿀지 — PLAN 2.1 문구 변경 | 채택하되 PLAN 버전 올림. 10-09 에는 산출만 |
-| H5 | 초벌 정책: holdout 블라인드, tune 만 L0 regex 초벌, LLM 초벌 없음 | 그대로 |
-| H6 | 10-09 에 100 미만일 때 처리(§3.1) | Phase 2 예정대로 시작, 2.1 실주입 없음, 라벨 계속 |
-| H7 | 라벨 시간대·분량(하루 15–20분, 5일 약 70분) | 그대로, 저녁 1회 |
+## 6. 결정 (HITL) — 결정 (2026-10-04 유저 AUQ): **H1–H7 전부 추천안 채택**
+| # | 질문 | 추천안 | 결정 (2026-10-04 유저 AUQ) · 반영 |
+|---|---|---|---|
+| H1 | gold 후보 출처를 트랜스크립트(Claude, +Codex?)로 하고 `~/.pi-router/gold/` 를 만들어도 되나 | Claude 트랜스크립트만, 폴더 생성 승인. Codex 는 2.4 에서 | **채택.** 출처 = Claude Code 트랜스크립트만(Codex 는 2.4). `gold/` 는 `$PI_ROUTER_HOME/gold/`(0700, 파일 0600) — 도구가 첫 `extract` 실행 때 만든다(10-04 현재 미생성) |
+| H2 | `gold_draft.py`(extract·label) 를 이 저장소에 작성·커밋해도 되나 | 작성 → 합성 시험 → 커밋(push 는 별도) | **채택.** `09639e1`(feat/gold-draft, push 안 함), 합성 시험 16건 |
+| H3 | 표본 규칙(§2.2: 제외 대상·층화·세션 ≤ 4·시그니처 ≤ 2·120 추출) | 그대로 | **채택.** §2.2 그대로 구현, 구체화는 §4.2 구현 메모 |
+| H4 | 2.1 진입을 gold 대리 지표(클래스별 L0 오판정 ≤ 10%, n ≥ 20)로 두고 K4 는 유지 조건으로 바꿀지 — PLAN 2.1 문구 변경 | 채택하되 PLAN 버전 올림. 10-09 에는 산출만 | **채택.** PLAN v0.3.1 2.1 완료 판정 변경, 정의는 EVAL §2.3, 집계는 `gold_stats.json` `l21_entry_proxy`. 10-09 에는 산출만 |
+| H5 | 초벌 정책: holdout 블라인드, tune 만 L0 regex 초벌, LLM 초벌 없음 | 그대로 | **채택.** holdout 후보에는 `draft_label` 필드 자체가 없고 `label` 화면에도 안 나온다 |
+| H6 | 10-09 에 100 미만일 때 처리(§3.1) | Phase 2 예정대로 시작, 2.1 실주입 없음, 라벨 계속 | **채택.** gold 개수와 무관하게 10-09 Phase 2 시작, 2.1 실주입 없음, 라벨 계속, K3 는 "잠정(n=k)" |
+| H7 | 라벨 시간대·분량(하루 15–20분, 5일 약 70분) | 그대로, 저녁 1회 | **채택.** 저녁 1회, 하루 15–20분 |
 
 ## 7. 이 문서가 하지 않은 것
 - 오류 본문 출력·인용(P4 의 종류는 메모리에서 첫 줄 형식·키워드로만 나눠 셈), 클래스 분포 추정.
 - Codex 세션의 실패 건수 집계.
-- 도구 작성·`gold/` 생성·커밋.
+- (최초 초안 기준) 도구 작성·`gold/` 생성·커밋. → 10-04 결정 뒤 도구 작성·커밋은 `09639e1` 에서 함. `gold/` 생성·실데이터 추출은 아직 안 함(10-05 `extract` 첫 실행 때).

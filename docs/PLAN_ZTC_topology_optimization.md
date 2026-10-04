@@ -1,7 +1,8 @@
-# PLAN — Pi 토폴로지 ZTC 고도화 · 추측 실행 체계 구축 (실행 계획 v0.3)
+# PLAN — Pi 토폴로지 ZTC 고도화 · 추측 실행 체계 구축 (실행 계획 v0.3.1)
 
 - Status: **v0.3 머지본 (D5, 2026-09-24)** — 아스트라 2차 검토·A1~A12·M1~M6 반영. v0.3 문서 세트는 두 트랙 G0 에서 유저 승인. 트랙 A(Opus 5.5) 초안을 기반으로 삼았고, 트랙 B(Luna) 초안의 계약표 행·K0·보존 절차는 `docs/harness/` 두 문서에 접목했다. 비교와 머지안: `docs/evidence/ztc-phase1-merge-20260924/comparison.md`. main 반영(D6)은 유저 승인 대기.
-- 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro. v0.1 2026-09-23 → v0.2 2026-09-24 → v0.3 2026-09-24 Claude Code (Opus 5.5, worktree `~/Pi-wt/ztc-opus55`)
+- 작성: Claude Code (Fable 5.1) @ richardkim-macpro-macbookpro. v0.1 2026-09-23 → v0.2 2026-09-24 → v0.3 2026-09-24 Claude Code (Opus 5.5, worktree `~/Pi-wt/ztc-opus55`) → v0.3.1 2026-10-04 Claude Code (Opus 5.5, worktree `ztc-router-gold`)
+- v0.3.1 변경(2026-10-04 유저 AUQ H4): Phase 2 WBS 2.1 의 완료 판정을 "K4 ≤ 10% 인 클래스만" → **진입 = gold 대리 지표, K4 = 유지 조건** 으로 바꿈. 사유: K4 는 주입 뒤에만 분모가 생겨 진입 조건으로 쓰면 순환. 근거·일정은 `docs/harness/GOLD100_SCHEDULE_ztc.md` §1.3·§6, 지표 정의는 `docs/harness/EVAL_PROTOCOL_ztc.md` §2.3. 다른 절은 v0.3 그대로.
 - v0.3 신규 정본 문서: 훅 계약표 `docs/harness/HOOK_CONTRACT_ztc.md`, 평가 규약 `docs/harness/EVAL_PROTOCOL_ztc.md`. 이 계획과 두 문서가 다르면 두 문서가 세부 정본이다.
 - v0.3 추가 근거: `docs/evidence/ztc-plan-review-20260924/astra-review-2.md`, `claude-code-verification-A1-A12.md`(2차 회신 절)
 - 발주: 유저 지시문 (원문: `learning/user-prompts/2026-09-23_Wed/04_ztc-topology-plan-request.md`); v0.2 는 유저 지시 "다른 에이전트 관점 검토 후 개선" (`learning/user-prompts/2026-09-24_Thu/03_review-then-astra-handoff.md`)
@@ -65,7 +66,7 @@ v0.3 은 세 번째 감사(아스트라)의 지적으로 **계약서와 채점�
 | K1 | 훅 지연 **p50 / p95 / p99 / 타임아웃률 / 중립 반환률** — **전체 지연(프로세스 기동 포함)과 내부 RPC 지연을 분리** | 미측정(훅 미배선) → W3 shadow 가 첫 값 | 내부 RPC p99 ≤ 30 ms, 타임아웃률 < 1%. 전체 지연은 보고만 | 원자료 `$PI_ROUTER_HOME/telemetry/hook_events.jsonl`(저장소 밖, M3), 집계만 `learning/metrics/`. cold/warm 구분 |
 | K2 | 무토큰 분류율 = L0 확정 판정 건수 / **실패한 도구 호출(exit≠0) 건수** | 미측정 | ≥ 50% (반복 에러·린트) | 분모 고정. "최초 관측 시그니처" 와 "재관측" 분리. **분류율 ≠ 해결률**(A11) |
 | K3 | **shadow 처방 적합률 (gold 대비) + 95% CI** — Phase 1 exit 지표(A2) | gold 확보 후(Phase 1.6, G3 이후) | Phase 2 비교: L0 v1 vs 휴리스틱 **paired 비열등**, 마진 3%p. 검정력·discordance·세션 그룹 분할·tune/holdout 분리를 **사전 지정**(A3). 표본 수 규칙(300→3%p, 1000→1%p)은 철회 | holdout 30%(세션 단위), 유저 검수, 클래스별 ≥ 20건 미만이면 "표본 부족" |
-| K4 | **오처방률** = 주입된 처방 후 채택/해결/재발/포기/회귀 5분류 | **shadow 에서는 N/A**(주입 0 → 분모 없음. "0%" 아님, A2) | ≤ 10% (additionalContext 단계부터) | 해결 = 목표 검사 성공 확인. 포기·관측 종료는 별도 집계(A11) |
+| K4 | **오처방률** = 주입된 처방 후 채택/해결/재발/포기/회귀 5분류 | **shadow 에서는 N/A**(주입 0 → 분모 없음. "0%" 아님, A2) | ≤ 10% (additionalContext 단계부터) — v0.3.1: 2.1 의 **유지** 조건(넘으면 그 클래스 opt-in 해제). 진입 조건은 gold 대리 지표(EVAL §2.3) | 해결 = 목표 검사 성공 확인. 포기·관측 종료는 별도 집계(A11) |
 | K5 | 프리페치 히트율 / 히트 시 도구 실행 시간 | 없음 | 히트율 ≥ 30%(로컬 워커) | Phase 2. 순대기시간 절감과 동일시하지 않는다(A11) |
 | K6 | 프리페치 낭비율 | 없음 | ≤ 30% | 취소·미사용 작업 / 발행 작업, CPU 시간 가중 |
 | K7 | **세션당 총비용(전후 비교)** — input + cache_write + cache_read + output + L3 + retry, 성공률·완료시간 동시 보고(A11) | 최근 11세션 output 3.06M tokens(output 만) | 동종 작업 기준 −15% | transcript usage 집계 스크립트. HUD 의 상수 절감치는 폐기 |
@@ -166,7 +167,7 @@ tool call ─► hook client (에이전트별 stdin/stdout 프로토콜, 파일 
 ### Phase 2 — 로컬 프리페치·L3·튜닝 (2026-10-09 ~ 2026-10-29) · Pi
 | WBS | 산출물 | 완료 판정 |
 |---|---|---|
-| 2.1 개입 opt-in | shadow → `additionalContext` → 클래스별 `deny`/`updatedInput` | K4 오처방률 ≤ 10% 인 클래스만 opt-in |
+| 2.1 개입 opt-in | shadow → `additionalContext` → 클래스별 `deny`/`updatedInput` | (v0.3.1) **진입:** gold holdout 에서 L0 가 클래스 X 로 판정한 행이 ≥ 20건이고 그중 유저 라벨 ≠ X 비율 ≤ 10% 인 클래스만 `additionalContext` opt-in(EVAL §2.3, `gold_stats.json` `l21_entry_proxy`). **유지:** 주입 뒤 K4 오처방률 ≤ 10%, 넘으면 그 클래스 opt-in 해제(R2). 10-09 에는 대리 지표 산출만 하고 실주입은 켜지 않는다. `deny`/`updatedInput` 은 §3 별도 트랙 심사 그대로 |
 | 2.2 로컬 프리페치 워커 | 규칙표 10개, write-tree digest, TTL·취소, `updatedInput` 히트 반환 | K5·K6 첫 실측, 취소 시나리오 5개 |
 | 2.3 L3 실 HTTP + 스키마 | mock 서버 테스트, 재시도 1회 | 스키마 위반 주입 시 재시도 ≤ 1, 폴백 중립 `{}` |
 | 2.4 gold 300건 + 파레토 제안 | `learning/metrics/pareto_<date>.json` | τ 제안 1세트, CI 명시 |
