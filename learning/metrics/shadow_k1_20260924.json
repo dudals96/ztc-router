@@ -1,0 +1,44 @@
+{
+  "schema": "ztc-shadow-k1/1",
+  "date": "20260924",
+  "node": "richardkim-macpro-macbookpro",
+  "agent": "claude-code 2.1.281 (opus 5.5, track A)",
+  "source": "shadow hook_events (live Bash calls in this session) + transcript hook durationMs",
+  "calls_total": 243,
+  "outcomes": {
+    "ok": 227,
+    "absent": 8,
+    "timeout": 6,
+    "disabled": 2
+  },
+  "internal_rpc_ms_ok": {
+    "n": 227,
+    "p50": 1.754,
+    "p95": 3.312,
+    "p99": 4.212
+  },
+  "client_ms_ok_excl_interpreter_start": {
+    "p50": 1.878,
+    "p95": 3.55,
+    "p99": 4.417
+  },
+  "harness_duration_ms_full": {
+    "n": 240,
+    "p50": 54.0,
+    "p95": 67.0,
+    "p99": 70.0,
+    "max": 84.0,
+    "note": "transcript hook_success durationMs, includes sh -c guard + interpreter start; runs in parallel with the Tier-2 hook"
+  },
+  "timeout_rate": 0.0247,
+  "timeout_note": "all 6 timeouts from the deliberate SIGSTOP test",
+  "neutral_return_rate": 1.0,
+  "neutral_note": "240/240 transcript records stdout == {}",
+  "k2_l0_hits_in_shadow": 0,
+  "k2_note": "failed Bash calls do not reach PostToolUse; PostToolUseFailure not registered",
+  "k3": "기준선 미확보 (gold 부재)",
+  "k4": "N/A (shadow: no injection)",
+  "cold_warm": "live calls are all fresh client processes; daemon warm except first call after restart. Cold/warm split: see bench_20260924.json",
+  "provisional": "track draft value; merge-stage sequential re-measurement is the comparison value",
+  "prior_values_note": "이전 값(18 ms·34.2 ms·38.5 ms 등)은 코드 상수로 만든 시뮬 값이며 측정이 아니다"
+}

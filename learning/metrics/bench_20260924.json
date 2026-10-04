@@ -1,0 +1,153 @@
+{
+  "schema": "ztc-bench/1",
+  "date": "20260924",
+  "env": {
+    "node": "Richardkim-macproui-MacBookPro.local",
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.6",
+    "head": "3a979dc6784c29aa3f689fdb291070f2fa25833b",
+    "worktree_dirty": false,
+    "code_sha256": "4b92e9c889e0900179dd62799e0817052d9a73dec5df1147416ac8f0478b103f"
+  },
+  "budget_ms": 30.0,
+  "protocol": "docs/harness/EVAL_PROTOCOL_ztc.md §3",
+  "warm_n": 200,
+  "cold_n": 30,
+  "results": {
+    "cold": {
+      "full": {
+        "n": 15,
+        "p50": 27.616874998784624,
+        "p95": 37.62912499951199,
+        "p99": 37.62912499951199,
+        "max": 37.62912499951199,
+        "over_budget_rate": 0.1333,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "rpc": {
+        "n": 15,
+        "p50": 0.5628329963656142,
+        "p95": 0.9611249988665804,
+        "p99": 0.9611249988665804,
+        "max": 0.9611249988665804,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "daemon_startup_ms": {
+        "n": 30,
+        "p50": 79.45441600168124,
+        "p95": 160.88712500641122,
+        "p99": 172.40029100503307,
+        "max": 172.40029100503307,
+        "over_budget_rate": 1.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      }
+    },
+    "warm": {
+      "conc1/l0_regex/full": {
+        "n": 200,
+        "p50": 24.488042006851174,
+        "p95": 25.89691599132493,
+        "p99": 26.65066599729471,
+        "max": 29.388708993792534,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc1/l0_regex/rpc": {
+        "n": 200,
+        "p50": 0.2876249927794561,
+        "p95": 0.34779201087076217,
+        "p99": 0.3678330103866756,
+        "max": 0.4645000008167699,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc1/l0_ledger/full": {
+        "n": 200,
+        "p50": 24.63204099331051,
+        "p95": 25.559250003425404,
+        "p99": 25.873375008814037,
+        "max": 28.532291995361447,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc1/l0_ledger/rpc": {
+        "n": 200,
+        "p50": 0.29570799961220473,
+        "p95": 0.331375005771406,
+        "p99": 0.42404100531712174,
+        "max": 0.4627089947462082,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc3/l0_regex/full": {
+        "n": 200,
+        "p50": 28.90845799993258,
+        "p95": 32.08041700418107,
+        "p99": 34.087583000655286,
+        "max": 36.83037500013597,
+        "over_budget_rate": 0.175,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc3/l0_regex/rpc": {
+        "n": 200,
+        "p50": 0.7954169996082783,
+        "p95": 1.0190000029979274,
+        "p99": 1.139083004090935,
+        "max": 1.3782919995719567,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc3/l0_ledger/full": {
+        "n": 200,
+        "p50": 28.60266700736247,
+        "p95": 30.35466599976644,
+        "p99": 37.32870800013188,
+        "max": 38.079875012044795,
+        "over_budget_rate": 0.1,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      },
+      "conc3/l0_ledger/rpc": {
+        "n": 200,
+        "p50": 0.7585419953102246,
+        "p95": 1.0207919985987246,
+        "p99": 1.1256660072831437,
+        "max": 1.3363749894779176,
+        "over_budget_rate": 0.0,
+        "timeout_rate": 0.0,
+        "neutral_rate": 1.0
+      }
+    }
+  },
+  "daemon_handle_ms": {
+    "p50": 0.03962501068599522,
+    "p95": 0.12983300257474184,
+    "p99": 0.2472500054864213
+  },
+  "daemon_counters": {
+    "observe": 1621,
+    "l0_regex": 820,
+    "l0_ledger": 0,
+    "miss": 0,
+    "pre": 0,
+    "rejected_413": 0,
+    "rejected_400": 0,
+    "rejected_503": 0,
+    "cancelled": 0,
+    "errors": 0,
+    "post_ok": 801
+  },
+  "measured_on": "merge branch ztc/phase1-merged at 3a979dc (grafts included), richardkim-macpro-macbookpro, sequential run, no other bench running",
+  "prior_values_note": "이전 값(18 ms·34.2 ms·38.5 ms 등)은 코드 상수로 만든 시뮬 값이며 측정이 아니다",
+  "raw": "$PI_ROUTER_HOME/telemetry/bench_20260924.jsonl"
+}

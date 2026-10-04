@@ -45,3 +45,5 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s engines/hybrid_router/
 ## 분리 방식
 
 Pi `main` @ `a3ed310` 을 로컬 복제한 뒤 `git filter-repo --paths-from-file` 로 위 경로의 커밋 이력만 남겼다(38커밋). 분리 직후 모든 파일의 blob 해시가 Pi `a3ed310` 과 같음을 확인했다. 원 커밋 해시는 바뀌었으므로 Pi 쪽 증거 문서가 가리키는 해시는 Pi 저장소에서 찾는다. 사용한 경로 목록은 `docs/MIGRATION_PATHS.txt`.
+
+보충 이관(2026-10-04): 경로 목록에서 빠졌던 `scripts/bench/`(`hook_bench.py`·`gold_tool.py`)와 `learning/metrics/` 집계 3개를 Pi `e918574` 내용 그대로 복사했다(이력 없이). `ztc/paths.py` 의 `METRICS_DIR` 이 이 저장소의 `learning/metrics/` 를 가리킨다. 경위는 `docs/harness/PHASE2_READINESS_ztc.md` F12.

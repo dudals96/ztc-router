@@ -1,0 +1,23 @@
+{
+  "schema": "ztc-gold/1",
+  "rows": 0,
+  "by_split": {
+    "tune": 0,
+    "holdout": 0
+  },
+  "by_label_source": {
+    "user": 0,
+    "agent-draft": 0
+  },
+  "holdout_seal_sha256": null,
+  "holdout_eval_n": 0,
+  "holdout_by_class": {},
+  "k3_shadow_fit_rate": {
+    "value": null,
+    "wilson95": null,
+    "l0_abstained": 0,
+    "status": "기준선 미확보 (gold 부재)"
+  },
+  "paired_vs_heuristic": null,
+  "gold_file_present": false
+}

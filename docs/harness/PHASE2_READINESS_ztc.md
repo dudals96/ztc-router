@@ -23,6 +23,8 @@ Phase 2 의 첫 항목(2.1 advisory opt-in)은 **K4 오처방률 ≤ 10%** 를 �
 | F8 | 편입 후보의 적격성 | AB_EVAL §2.2 적격 = **Pi 저장소 안에서 로컬 파일·로컬 테스트로 끝나는 루프**. 원격 노드(SSH·TeamViewer)·NV 저장소·공유 외부 서비스를 건드리면 부적격. apply 15건 중 상당수는 다른 저장소(youtube-ext-atom 등)·원격 노드 루프다 — 예: 이 점검을 낳은 루프(gate `31e6d883e2d8`)도 NVG SSH 디스패치를 포함해 부적격 `[추정: 건별 대조 안 함]` | §2.2, U6 "혼합 6블록" |
 | F9 | A/A 보정 | U2 가 승인한 Phase 1 A/A 2쌍(루프 4개) — 실행 증거 없음 `[확인됨: docs/evidence 에 A/A 0건]` | `docs/evidence/` 는 phase1·merge·plan-review 4개뿐 |
 | F10 | U5 텔레메트리 필드 | `session`(session_id sha256 12자)은 이미 있음(`scripts/hooks/router_client.py:70`). **`arm`(`PI_AB_ARM`) 없음**, `CLIENT_VERSION = "ztc-phase1-0.1"`(`:42`) `[확인됨]` | grep |
+| F12 | 분리 때 빠진 경로 | `scripts/bench/`(hook_bench·gold_tool)와 `learning/metrics/` 가 `docs/MIGRATION_PATHS.txt` 에 없어 Pi 에만 있었다. `METRICS_DIR` 은 이 저장소를 가리킴 → 2026-10-04 보충 이관(D4) `[확인됨]` | README "분리 방식" |
+| F13 | 원자료 보존 | 텔레메트리 14일 자동 삭제(`EVAL_PROTOCOL_ztc.md` §0) — 09-24·25 원자료는 10-08~09 에 사라진다. D2 집계는 그 전에 해야 함 `[확인됨]` | `telemetry.prune()` |
 | F11 | 실행 기준 전환 | 아직 `~/Pi` 가 live(launchd 2개·훅 3곳). 전환은 "첫 집계 뒤 별도 유저 승인"(README) — 첫 집계(F4)가 없어 조건 미충족 `[확인됨]` | README "정본과 실행 기준" |
 
 ## 2. Phase 2 WBS 별 준비
