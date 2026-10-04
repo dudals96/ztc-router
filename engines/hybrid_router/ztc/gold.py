@@ -20,6 +20,7 @@ SCHEMA = "ztc-gold/1"
 LABELS = {"syntax_compile", "dependency_missing", "lint_formatting", "permission_auth", "other", "abstain"}
 EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure"}
 MIN_PER_CLASS = 20
+PROXY_MAX_WRONG = 0.10  # 2.1 entry proxy (GOLD100_SCHEDULE_ztc.md H4, EVAL §2.3)
 _ID = re.compile(r"^g-[0-9a-f]{8}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ABS = re.compile(r"(?<![\w.~>])/(?:Users|home|private|var|etc|opt|tmp)/|\b[A-Za-z]:\\")
@@ -107,10 +108,15 @@ def aggregate(rows: list[dict], heuristic=None) -> dict:
         by_class[r["label"]] = by_class.get(r["label"], 0) + 1
     sigs = l0.compile_signatures(l0.load_rules())
     hits = abstain = b = c = 0
+    judged: dict[str, list[int]] = {}
     for r in evalset:
         pred = l0.classify_regex(r["text"], sigs)
         if pred is None:
             abstain += 1
+        else:
+            tally = judged.setdefault(pred, [0, 0])
+            tally[0] += 1
+            tally[1] += pred != r["label"]
         l0_ok = pred == r["label"]
         hits += l0_ok
         if heuristic is not None:
@@ -131,6 +137,11 @@ def aggregate(rows: list[dict], heuristic=None) -> dict:
             "wilson95": wilson(hits, n),
             "l0_abstained": abstain,
             "status": "measured" if n else "기준선 미확보 (gold 부재)",
+        },
+        "l21_entry_proxy": {
+            cls: {"n": k, "wrong": w, "wrong_rate": round(w / k, 4), "wilson95": wilson(w, k),
+                  "eligible": k >= MIN_PER_CLASS and w / k <= PROXY_MAX_WRONG}
+            for cls, (k, w) in sorted(judged.items())
         },
         "paired_vs_heuristic": {"l0_only_correct_b": b, "heuristic_only_correct_c": c,
                                 "note": "counts only; non-inferiority requires the pre-registered power check"}

@@ -60,6 +60,20 @@ class TestGoldAggregate(unittest.TestCase):
         self.assertFalse(stats["holdout_by_class"]["permission_auth"]["sufficient"])
         self.assertEqual(len(stats["holdout_seal_sha256"]), 64)
 
+    def test_l21_entry_proxy(self):
+        # L0 says syntax_compile on 21 rows; the user disagrees on 2 -> 2/21 <= 10% with n >= 20
+        rows = [row(i) for i in range(19)] + [row(19, label="other"), row(20, label="other"),
+                                              row(21, label="permission_auth", text="EACCES: denied"),
+                                              row(22, label="other", text="weird failure"), row(23, split="tune")]
+        proxy = gold.aggregate(rows)["l21_entry_proxy"]
+        self.assertEqual(proxy["syntax_compile"]["n"], 21)
+        self.assertEqual(proxy["syntax_compile"]["wrong"], 2)
+        self.assertTrue(proxy["syntax_compile"]["eligible"])
+        self.assertFalse(proxy["permission_auth"]["eligible"])  # n=1 < 20
+        self.assertNotIn("other", proxy)  # L0 abstained on the weird row: not a judgement
+        rows.append(row(24, label="other"))  # 3/22 > 10%
+        self.assertFalse(gold.aggregate(rows)["l21_entry_proxy"]["syntax_compile"]["eligible"])
+
 
 if __name__ == "__main__":
     unittest.main()
