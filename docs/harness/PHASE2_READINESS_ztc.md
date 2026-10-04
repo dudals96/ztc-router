@@ -67,7 +67,9 @@ Phase 2 의 첫 항목(2.1 advisory opt-in)은 **K4 오처방률 ≤ 10%** 를 �
 
 - **D6 집행** `bca1ce7`: 훅 텔레메트리에 `session`(해시)·`arm`(`PI_AB_ARM`/`.pi-ab-arm`, 짧은 라벨 아니면 `invalid`), `CLIENT_VERSION = "ztc-phase2-0.1"`. AB_EVAL §2.5 문장 갱신.
 - **D5 집행:** 게이트 `ab-gate-0.3` — 질의 기록에 `eligible_project`(프로젝트 폴더 이름이 `config/ab_gate.json` `eligible_projects`(기본 Pi·ztc-router)에 있는지), 적격 밖이면 질의 문구에 한 줄 알림. 힌트일 뿐 — 적격 프로젝트라도 원격·공유 서비스를 건드리면 부적격.
-- D4~D6 은 **정본에만** 있다. live(`~/Pi`)는 D1+D3 전환 때 반영(별도 승인).
+- **D1+D3 집행(2026-10-04 20:5x, 유저 AUQ 승인):** launchd 두 서비스를 이 저장소로 옮겨 재시작(데몬 127.0.0.1:9876 ready), 전역 Claude 훅 게이트 경로 변경 + Bash Pre·Post·PostFailure 추가(`~/Pi` 프로젝트에선 건너뜀), Codex 게이트 경로 변경.
+  검증: 전환 직후 이 세션(youtube-ext-atom)의 Bash 호출이 `ztc-phase2-0.1` 레코드로 기록됨(session 해시 있음, arm 없음), 게이트 수동 시험 `ab-gate-0.3` not_loop. 백업·되돌리기는 README.
+  첫 주기 데몬 bootstrap 이 `Input/output error`(5)로 한 번 실패 — bootout 직후라 아직 내려가는 중이었던 것으로 보임 `[추정]`, 재시도로 해결.
 
 ## 4. 이 점검이 하지 않은 것
 - apply 15건의 건별 적격 판정(F8 은 표본 1건 + 규칙으로 추정).

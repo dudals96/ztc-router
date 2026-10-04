@@ -2,18 +2,19 @@
 
 Pi 토폴로지 ZTC(하이브리드 라우터 + 훅 클라이언트 + 평가 게이트) 구현체를 Pi 저장소에서 분리한 개발 저장소다. 2026-09-28 유저 지시로 분리했다.
 
-## 정본과 실행 기준 (전환 전까지 유효)
+## 정본과 실행 기준 (2026-10-04 전환)
 
 | 구분 | 위치 | 비고 |
 |---|---|---|
 | 개발 정본 | 이 저장소 (`~/projects/ztc-router`, `dudals96/ztc-router`) | 코드·계획·평가 문서의 새 변경은 여기서만 한다 |
-| 실행 기준 (live) | `~/Pi` 의 같은 경로 사본 | launchd `com.pi.router-daemon`·`com.pi.router-healthcheck`, Pi 프로젝트 훅 `router-client.sh`, 전역 Claude Code·Codex 훅 `ab-prompt-gate.sh` 가 `~/Pi` 를 가리킨다 |
+| 실행 기준 (live) | **이 저장소** | launchd `com.pi.router-daemon`·`com.pi.router-healthcheck`(ProgramArguments·WorkingDirectory), 전역 Claude Code 훅(`ab-prompt-gate.sh` + Bash Pre·Post·PostFailure `router-client.sh`), Codex 훅(`ab-prompt-gate.sh`)이 이 저장소를 가리킨다 |
+| 남은 Pi 배선 | `~/Pi/.claude/settings.json` 프로젝트 훅 3개 → `~/Pi` 사본 `router-client.sh`(`ztc-phase1-0.1`) | 전역 Bash 훅은 프로젝트가 `~/Pi` 일 때 건너뛴다(이중 기록 방지). Pi 사본 정리 때 프로젝트 훅을 지우고 전역 훅의 건너뛰기를 없앤다 |
 | 런타임 데이터 | `~/.pi-router` | 저장소 밖. 이관 대상 아님 |
 
-- 10-02 shadow 첫 집계가 끝날 때까지 실행 기준은 `~/Pi` 에 둔다. 7일 수집 창을 끊지 않기 위해서다.
-- 그동안 `~/Pi` 쪽 ZTC 파일은 고치지 않는다. 여기서 고친 내용을 live 에 반영해야 하면 전환을 앞당기는 별도 승인을 받는다.
-  - 예외 기록(2026-10-03, 유저 AUQ 승인): 평가 게이트가 세션 간 메시지·서브에이전트 보고에 묻지 않게 한 수정을 `~/Pi`(`6d2f7a3`)와 여기(`6c8fe2e`)에 같이 넣었다. 10-02 집계 창은 지난 뒤다.
-- 전환(launchd 2개·훅 3곳 경로 변경, 데몬 재시작)과 Pi 쪽 사본 정리는 첫 집계 뒤 별도 유저 승인으로 한다.
+- 전환(2026-10-04, 유저 AUQ 승인 — `docs/harness/PHASE2_READINESS_ztc.md` D1·D3): 10-02 첫 집계를 D2(`learning/metrics/shadow_k1k2_20261004.json`)로 대신한 뒤 실행.
+  live 가 정본과 같아져 `ztc-phase2-0.1`(arm·session 필드)·`ab-gate-0.3`(적격 힌트)이 바로 적용됐다. 이제 이 저장소의 `main` 이 곧 live 이므로, 고친 뒤 커밋하면 다음 훅 호출부터 반영된다(데몬 코드는 재시작 필요).
+- 되돌리기: `~/.pi-router/backup-ztc-switch-20261004/`(plist 2개·`~/.claude/settings.json`·`~/.codex/config.toml` 전환 직전 사본)을 제자리에 복사하고 `launchctl bootout`/`bootstrap` 으로 두 서비스를 다시 올린다.
+- 이전 규칙 기록: 전환 전에는 `~/Pi` 쪽 ZTC 파일을 고치지 않았다(예외 2026-10-03 `6d2f7a3`·`6c8fe2e`). Pi 쪽 사본 정리는 별도 유저 승인으로 한다.
 
 ## 구성
 
