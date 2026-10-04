@@ -48,8 +48,8 @@
 - **순서 효과:** 여러 쌍을 돌릴 때 어느 창을 먼저 시작하는지 쌍마다 번갈아(동전 던지기 결과 기록) 배정한다.
 
 ### 2.5 텔레메트리 arm 태깅
-- `hook_events.jsonl` 레코드에는 세션·arm 필드가 없다(키: ts, client_version, request_id, outcome, event, tool, program, exit_code, response_keys, rpc_ms, client_ms). 그래서 **arm 태깅 = 전용 `PI_ROUTER_HOME` 경로**로 한다. 집계 시 경로 이름(`…-A`)이 arm 라벨이다.
-- 보조 교차 확인: `ts` 가 A 세션의 첫·마지막 메시지 시각 안에 있는지, `client_version` 이 실험 당시 값인지(현재 `ztc-phase1-0.1`, `scripts/hooks/router_client.py:42`). Phase 2 클라이언트에 `arm`·`session` 필드를 넣을지는 §6 U5.
+- `hook_events.jsonl` 레코드 키: ts, client_version, request_id, outcome, event, tool, program, exit_code, response_keys, rpc_ms, client_ms, **session·arm**(U5, `ztc-phase2-0.1` 부터 — 2026-10-04 `PHASE2_READINESS_ztc.md` D6. `ztc-phase1-0.1` 레코드에는 없다). **arm 태깅의 1차 근거는 그대로 전용 `PI_ROUTER_HOME` 경로**이고(집계 시 경로 이름 `…-A` 가 arm 라벨), `arm` 필드는 교차 확인용이다.
+- 보조 교차 확인: `ts` 가 A 세션의 첫·마지막 메시지 시각 안에 있는지, `client_version` 이 실험 당시 값인지(정본 `ztc-phase2-0.1`, `scripts/hooks/router_client.py:42` — live 는 전환 전까지 `ztc-phase1-0.1`), `arm` 필드가 경로 라벨과 같은지.
 - `router_events.jsonl`(ts, kind, request_id, event, program, exit_code, source, error_class, signature, queued, handle_ms)은 `request_id` 로 hook_events 와 이어 붙인다. 명령 원문은 어디에도 복사하지 않는다.
 
 ## 3. 평가표

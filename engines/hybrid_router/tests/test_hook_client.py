@@ -163,6 +163,34 @@ class TestHappyPath(HookClientTest):
         self.assertIsNotNone(ev["rpc_ms"])
         self.assertNotIn(SECRET, (self.home / "telemetry" / "hook_events.jsonl").read_text())
 
+    def test_arm_and_session_in_record(self):
+        """AB_EVAL U5: telemetry carries the arm label and the session hash, never the raw id."""
+        base = {k: v for k, v in os.environ.items() if k not in ("PI_AB_ARM", "CLAUDE_PROJECT_DIR")}
+        project = self.home.parent / "proj"
+        project.mkdir(parents=True, exist_ok=True)
+        cases = [
+            ({"PI_AB_ARM": "A"}, None, "A"),
+            ({"CLAUDE_PROJECT_DIR": str(project)}, "B\n", "B"),
+            ({"CLAUDE_PROJECT_DIR": str(project)}, "rm -rf / ; x", "invalid"),
+            ({}, None, None),
+        ]
+        for env, arm_file, want in cases:
+            marker = project / ".pi-ab-arm"
+            if arm_file is None:
+                marker.unlink(missing_ok=True)
+            else:
+                marker.write_text(arm_file)
+            with FakeServer() as srv:
+                proc = subprocess.run([str(CLIENT)], input=json.dumps(post_payload(cwd="/nonexistent")).encode(),
+                                      capture_output=True, timeout=5,
+                                      env={**base, **env, "PI_ROUTER_HOME": str(self.home), "PI_ROUTER_PORT": str(srv.port)})
+            self.assert_neutral(proc)
+            ev = self.events()[-1]
+            self.assertEqual(ev["arm"], want, env)
+            self.assertEqual(ev["client_version"], "ztc-phase2-0.1")
+            self.assertRegex(ev["session"], r"^[0-9a-f]{12}$")
+            self.assertNotIn("sess-1", json.dumps(ev))
+
     def test_pre_tool_use(self):
         payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "ls -la"}}
         with FakeServer() as srv:

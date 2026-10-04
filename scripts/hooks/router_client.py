@@ -39,7 +39,7 @@ from ztc.masking import MAX_TEXT, mask_cwd, mask_text  # noqa: E402
 import re  # noqa: E402
 from ztc.paths import BIND_HOST, disabled_marker, private_dir, router_home, router_port  # noqa: E402
 
-CLIENT_VERSION = "ztc-phase1-0.1"
+CLIENT_VERSION = "ztc-phase2-0.1"
 BUDGET_MS = 30.0
 MAX_STDIN = 64 * 1024
 MAX_RESPONSE = 16 * 1024
@@ -56,6 +56,25 @@ def _exit_code(resp):
             if isinstance(resp.get(key), int):
                 return resp[key]
     return None
+
+
+_ARM_RE = re.compile(r"[A-Za-z0-9_-]{1,8}")
+
+
+def ab_arm(payload: dict) -> str | None:
+    """A/B arm label (AB_EVAL_ztc §6 U5): PI_AB_ARM, else a .pi-ab-arm file in the project
+    dir (the same rule as the A/B prompt gate). Anything but a short label reads as unknown."""
+    raw = os.environ.get("PI_AB_ARM")
+    if raw is None:
+        project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+        try:
+            raw = (Path(project) / ".pi-ab-arm").read_text(encoding="utf-8")[:16] if project else None
+        except (OSError, ValueError):
+            raw = None
+    if raw is None:
+        return None
+    raw = raw.strip()
+    return raw if _ARM_RE.fullmatch(raw) else "invalid"
 
 
 def build_body(payload: dict) -> dict:
@@ -187,7 +206,7 @@ def reset_window() -> None:
 def main() -> None:
     t_start = time.perf_counter()
     record = {"client_version": CLIENT_VERSION, "request_id": uuid.uuid4().hex[:16]}
-    outcome, rpc_ms, body = "error", None, None
+    outcome, rpc_ms, body, arm = "error", None, None, None
     try:
         raw = sys.stdin.buffer.read(MAX_STDIN + 1)
         if len(raw) > MAX_STDIN:
@@ -201,6 +220,7 @@ def main() -> None:
                 outcome = "bad_json"
             elif disabled_marker().exists():
                 body = build_body(payload)
+                arm = ab_arm(payload)
                 if marker_age_sec() < REENABLE_AFTER_SEC:
                     outcome = "disabled"
                 else:
@@ -215,6 +235,7 @@ def main() -> None:
                         outcome = "disabled"
             else:
                 body = build_body(payload)
+                arm = ab_arm(payload)
                 outcome, rpc_ms = rpc(body, t_start + BUDGET_MS / 1000, record["request_id"])
     except Cancelled:
         outcome = "cancelled"
@@ -229,6 +250,8 @@ def main() -> None:
         "response_keys": body["response_keys"] if body else None,
         "rpc_ms": round(rpc_ms, 3) if rpc_ms is not None else None,
         "client_ms": round((time.perf_counter() - t_start) * 1000, 3),
+        "session": body["session"] if body else None,
+        "arm": arm,
     })
     try:
         if outcome not in ("disabled", "oversize", "bad_json") and not record.get("auto_reenabled"):
