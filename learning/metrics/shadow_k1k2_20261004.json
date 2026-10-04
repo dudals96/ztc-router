@@ -1,0 +1,64 @@
+{
+  "schema": "ztc-shadow-k1k2/1",
+  "date": "20261004",
+  "source": "shadow telemetry ($PI_ROUTER_HOME, counts only)",
+  "collection": {
+    "first": "2026-09-24",
+    "last": "2026-09-28",
+    "days_with_data": 3,
+    "by_day": {
+      "2026-09-24": 18,
+      "2026-09-25": 647,
+      "2026-09-28": 66
+    },
+    "window_days_planned": 7,
+    "window_met": false
+  },
+  "calls_total": 731,
+  "by_event": {
+    "PreToolUse": 366,
+    "PostToolUse": 350,
+    "PostToolUseFailure": 15
+  },
+  "outcomes": {
+    "absent": 7,
+    "ok": 711,
+    "disabled": 4,
+    "timeout": 9
+  },
+  "client_versions": {
+    "ztc-phase1-0.1": 731
+  },
+  "k1": {
+    "internal_rpc_ms_ok": {
+      "n": 711,
+      "p50": 2.408,
+      "p95": 5.897,
+      "p99": 16.993,
+      "max": 25.477
+    },
+    "client_ms_ok_excl_interpreter_start": {
+      "n": 711,
+      "p50": 2.547,
+      "p95": 6.054,
+      "p99": 17.12,
+      "max": 25.597
+    },
+    "timeout_rate": 0.0123,
+    "target": "internal RPC p99 <= 30 ms, timeout rate < 1%",
+    "full_latency": "not in telemetry (transcript hook durationMs) — not measured here"
+  },
+  "k2": {
+    "failed_calls": 15,
+    "l0_confirmed": 1,
+    "rate": 0.0667,
+    "first_sighting": 0,
+    "ledger_hit": 1,
+    "error_classes": {
+      "syntax_compile": 1
+    },
+    "target": ">= 50% (classification, not resolution)"
+  },
+  "k3": "기준선 미확보 (gold 부재)",
+  "k4": "N/A (shadow: no injection)"
+}
