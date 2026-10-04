@@ -1,5 +1,10 @@
 {
 	"enabled": true,
 	"decided": "2026-09-25",
-	"reason": "유저 지시(2026-09-25 저녁): 모든 프로젝트의 작업 루프 지시문마다 ZTC 평가 편입 여부를 먼저 묻는다. 유저가 'ZTC 평가 중지'라고 명시하면 멈춘다($PI_ROUTER_HOME/ab_gate_state.json). 이 값은 저장소 전체 비상 스위치 — false 면 어떤 경우에도 묻지 않는다. 이전 결정(Phase 2 전까지 끔, DECISION_20260925 §1 C3)을 대체한다."
+	"reason": "유저 지시(2026-09-25 저녁): 모든 프로젝트의 작업 루프 지시문마다 ZTC 평가 편입 여부를 먼저 묻는다. 유저가 'ZTC 평가 중지'라고 명시하면 멈춘다($PI_ROUTER_HOME/ab_gate_state.json). 이 값은 저장소 전체 비상 스위치 — false 면 어떤 경우에도 묻지 않는다. 이전 결정(Phase 2 전까지 끔, DECISION_20260925 §1 C3)을 대체한다.",
+	"eligible_projects": [
+		"Pi",
+		"ztc-router"
+	],
+	"eligible_note": "AB_EVAL §2.2 적격 힌트(질의 시점엔 프로젝트 폴더 이름만 앎). 2026-10-04 D5."
 }

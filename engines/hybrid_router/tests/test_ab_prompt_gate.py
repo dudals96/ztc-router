@@ -92,6 +92,31 @@ class GateTest(IsolatedHomeTest):
         self.assertIn(ev["gate_id"], ctx)
         self.assertEqual(ev["prompt_len"], len(PROMPT))
 
+    def test_eligibility_hint(self):
+        """AB_EVAL §2.2: the record and the question say whether the project can be an arm."""
+        def ask(cwd, cfg_text=None):
+            env = {}
+            if cfg_text is not None:
+                cfg = self.home.parent / "ab_gate_elig.json"
+                cfg.write_text(cfg_text)
+                env["PI_AB_GATE_CONFIG"] = str(cfg)
+            stdin = json.dumps({"cwd": cwd, "hook_event_name": "UserPromptSubmit",
+                                "prompt": PROMPT, "session_id": "s"}).encode()
+            with HealthServer() as srv:
+                out = json.loads(self.run_gate(stdin, srv.port, env))
+            return out["hookSpecificOutput"]["additionalContext"], self.events()[-1]
+
+        ctx, ev = ask("/x/Pi")
+        self.assertTrue(ev["eligible_project"])
+        self.assertNotIn("적격 힌트", ctx)
+        ctx, ev = ask("/x/youtube-ext-atom")
+        self.assertFalse(ev["eligible_project"])
+        self.assertIn("적격 힌트: 이 프로젝트(youtube-ext-atom)", ctx)
+        ctx, ev = ask("/x/youtube-ext-atom", '{"enabled": true, "eligible_projects": ["youtube-ext-atom"]}')
+        self.assertTrue(ev["eligible_project"])
+        ctx, ev = ask("/x/Pi", '{"enabled": true, "eligible_projects": "Pi"}')
+        self.assertTrue(ev["eligible_project"])  # malformed list → default
+
     def test_silent_when_switched_off(self):
         cfg = self.home.parent / "ab_gate_off.json"
         cfg.write_text('{"enabled": false}')

@@ -65,6 +65,10 @@ Phase 2 의 첫 항목(2.1 advisory opt-in)은 **K4 오처방률 ≤ 10%** 를 �
 | K3 | 기준선 미확보 (gold 부재) | — | — |
 | 전체 지연(하네스 durationMs) | 텔레메트리에 없음 — 측정 안 함 | 보고만 | — |
 
+- **D6 집행** `bca1ce7`: 훅 텔레메트리에 `session`(해시)·`arm`(`PI_AB_ARM`/`.pi-ab-arm`, 짧은 라벨 아니면 `invalid`), `CLIENT_VERSION = "ztc-phase2-0.1"`. AB_EVAL §2.5 문장 갱신.
+- **D5 집행:** 게이트 `ab-gate-0.3` — 질의 기록에 `eligible_project`(프로젝트 폴더 이름이 `config/ab_gate.json` `eligible_projects`(기본 Pi·ztc-router)에 있는지), 적격 밖이면 질의 문구에 한 줄 알림. 힌트일 뿐 — 적격 프로젝트라도 원격·공유 서비스를 건드리면 부적격.
+- D4~D6 은 **정본에만** 있다. live(`~/Pi`)는 D1+D3 전환 때 반영(별도 승인).
+
 ## 4. 이 점검이 하지 않은 것
 - apply 15건의 건별 적격 판정(F8 은 표본 1건 + 규칙으로 추정).
 - `~/Pi` 사본과 이 저장소의 코드 차이 대조(AB_EVAL 문서만 대조).

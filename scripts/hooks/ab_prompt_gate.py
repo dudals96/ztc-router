@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "engines" / "hybrid
 from ztc import telemetry  # noqa: E402
 from ztc.paths import BIND_HOST, router_home, router_port  # noqa: E402
 
-GATE_VERSION = "ab-gate-0.2"
+GATE_VERSION = "ab-gate-0.3"
 HEALTH_BUDGET_MS = 300.0
 MAX_STDIN = 1024 * 1024
 MAX_RESPONSE = 16 * 1024
@@ -72,6 +72,13 @@ CONTEXT = """[ZTC 평가 편입 게이트 · gate_id={gate_id}]
 DAEMON_WARNING = """
 - 주의: 라우터 데몬이 지금 응답하지 않는다(ready 아님). 상태 점검 루틴이 5분마다 복구를 시도한다. 유저에게 물을 때 이 사실을 한 줄로 알린다."""
 
+# AB_EVAL_ztc §2.2: only loops that stay inside these repos with local files and tests can be
+# run as A/B arms. The project name is all the gate knows when it asks, so this is a hint; a
+# loop in an eligible repo that touches a remote node or shared service is still ineligible.
+DEFAULT_ELIGIBLE_PROJECTS = ("Pi", "ztc-router")
+INELIGIBLE_NOTE = """
+- 적격 힌트: 이 프로젝트({project})는 A/B 실험 적격 범위(AB_EVAL §2.2 — Pi·ztc-router 안 로컬 루프) 밖이다. 편입해도 후보 기록일 뿐 실험 대상이 되기 어렵다. 유저에게 물을 때 이 사실을 한 줄로 알린다."""
+
 CONTROL_CONTEXT = {
     "paused_by_user": "[ZTC 평가 편입 게이트] 유저 요청으로 평가 편입 질의를 중지했다. 다시 켜려면 \"ZTC 평가 재개\". 이 사실을 유저에게 한 줄로 알린다.",
     "resumed_by_user": "[ZTC 평가 편입 게이트] 유저 요청으로 평가 편입 질의를 재개했다. 다음 작업 루프 지시부터 다시 묻는다. 이 사실을 유저에게 한 줄로 알린다.",
@@ -101,6 +108,18 @@ def gate_enabled() -> bool:
         return json.loads(path.read_text(encoding="utf-8")).get("enabled", True) is not False
     except (OSError, ValueError, AttributeError):
         return True
+
+
+def eligible_projects() -> tuple[str, ...]:
+    """config/ab_gate.json "eligible_projects" (list of repo folder names), else the default."""
+    path = Path(os.environ.get("PI_AB_GATE_CONFIG") or REPO_ROOT / "config" / "ab_gate.json")
+    try:
+        names = json.loads(path.read_text(encoding="utf-8")).get("eligible_projects")
+    except (OSError, ValueError, AttributeError):
+        names = None
+    if isinstance(names, list) and all(isinstance(n, str) for n in names):
+        return tuple(names)
+    return DEFAULT_ELIGIBLE_PROJECTS
 
 
 def is_loop_directive(prompt: str) -> bool:
@@ -215,15 +234,21 @@ def hook() -> str:
             gate_id = uuid.uuid4().hex[:12]
             ready = daemon_ready(time.perf_counter() + HEALTH_BUDGET_MS / 1000)
             cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else ""
+            project = Path(cwd).name[:64] if cwd else ""
+            eligible = project in eligible_projects()
             record.update({
                 "outcome": "asked", "gate_id": gate_id, "daemon_ready": ready,
-                "project": Path(cwd).name[:64] if cwd else "",
+                "project": project, "eligible_project": eligible,
                 "session": hashlib.sha256(str(payload.get("session_id", "")).encode()).hexdigest()[:12],
                 "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16],
                 "prompt_len": len(prompt),
             })
             ctx = CONTEXT.format(gate_id=gate_id, helper=HELPER, eval_doc=EVAL_DOC)
-            out = context_json(ctx if ready else ctx + DAEMON_WARNING)
+            if not ready:
+                ctx += DAEMON_WARNING
+            if not eligible:
+                ctx += INELIGIBLE_NOTE.format(project=project or "알 수 없음")
+            out = context_json(ctx)
     except Exception:
         record["outcome"] = "error"
         out = "{}"
